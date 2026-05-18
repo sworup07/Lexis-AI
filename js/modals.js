@@ -7,168 +7,149 @@
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('settingsModal')) return;
 
-  /* ── Generic modal open/close ────────────────────────────── */
-  function openModal(id) {
-    document.getElementById(id)?.classList.add('open');
-  }
-  function closeModal(id) {
-    document.getElementById(id)?.classList.remove('open');
-  }
-  function closeAllModals() {
-    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
-  }
+  const $ = id => document.getElementById(id);
 
-  /* Close on overlay click */
+  /* ── Generic modal helpers ────────────────────────────────── */
+  function openModal(id)   { $(id)?.classList.add('open');    }
+  function closeModal(id)  { $(id)?.classList.remove('open'); }
+  function closeAllModals(){ document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); }
+
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeAllModals();
-    });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAllModals(); });
   });
-
-  /* Close on Escape */
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeAllModals();
-  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllModals(); });
 
   /* ── Open buttons ─────────────────────────────────────────── */
-  document.getElementById('openSettingsBtn')?.addEventListener('click',     () => openModal('settingsModal'));
-  document.getElementById('openBillingBtn')?.addEventListener('click',      () => openModal('billingModal'));
-  document.getElementById('openThemeBtn')?.addEventListener('click',        () => openModal('themeModal'));
-  document.getElementById('popoverSettingsBtn')?.addEventListener('click',  () => { closePopover(); openModal('settingsModal'); });
-  document.getElementById('popoverBillingBtn')?.addEventListener('click',   () => { closePopover(); openModal('billingModal'); });
-  document.getElementById('popoverProfileBtn')?.addEventListener('click',   () => { closePopover(); openModal('settingsModal'); switchSettingsTab('account'); });
-  document.getElementById('upgradeProBtn')?.addEventListener('click',       () => showToast('Redirecting to payment… (connect eSewa/Khalti)'));
-  document.getElementById('contactSalesBtn')?.addEventListener('click',     () => showToast('Email us at sales@eduvision.ai'));
+  $('openSettingsBtn')?.addEventListener('click',    () => openModal('settingsModal'));
+  $('openBillingBtn')?.addEventListener('click',     () => openModal('billingModal'));
+  $('openThemeBtn')?.addEventListener('click',       () => openModal('themeModal'));
+  $('upgradeProBtn')?.addEventListener('click',      () => showToast('Redirecting to payment… (connect eSewa/Khalti)'));
+  $('contactSalesBtn')?.addEventListener('click',    () => showToast('Email us at sales@lexis.ai'));
+
+  $('popoverSettingsBtn')?.addEventListener('click', () => { closePopover(); openModal('settingsModal'); });
+  $('popoverBillingBtn')?.addEventListener('click',  () => { closePopover(); openModal('billingModal'); });
+  $('popoverProfileBtn')?.addEventListener('click',  () => { closePopover(); openModal('settingsModal'); switchSettingsTab('account'); });
 
   /* ── Close buttons ────────────────────────────────────────── */
-  document.getElementById('settingsCloseBtn')?.addEventListener('click', () => closeModal('settingsModal'));
-  document.getElementById('billingCloseBtn')?.addEventListener('click',  () => closeModal('billingModal'));
-  document.getElementById('themeCloseBtn')?.addEventListener('click',    () => closeModal('themeModal'));
+  $('settingsCloseBtn')?.addEventListener('click', () => closeModal('settingsModal'));
+  $('billingCloseBtn')?.addEventListener('click',  () => closeModal('billingModal'));
+  $('themeCloseBtn')?.addEventListener('click',    () => closeModal('themeModal'));
 
   /* ── Settings tabs ────────────────────────────────────────── */
   function switchSettingsTab(tabName) {
     document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.modal-nav-item').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab-' + tabName)?.classList.add('active');
-    document.querySelector(`.modal-nav-item[data-tab="${tabName}"]`)?.classList.add('active');
+    $('tab-' + tabName)?.classList.add('active');
+    document.querySelector('.modal-nav-item[data-tab="' + tabName + '"]')?.classList.add('active');
   }
 
   document.querySelectorAll('.modal-nav-item[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => switchSettingsTab(btn.dataset.tab));
   });
 
-  /* ── Billing — monthly/yearly toggle ─────────────────────── */
-  document.getElementById('billingToggle')?.addEventListener('change', (e) => {
-    const isYearly = e.target.checked;
-    const proEl   = document.getElementById('proPrice');
-    const teamEl  = document.getElementById('teamPrice');
-    if (proEl)  proEl.textContent  = isYearly ? 'NPR 499'  : 'NPR 799';
-    if (teamEl) teamEl.textContent = isYearly ? 'NPR 899'  : 'NPR 1,299';
+  /* ── Billing toggle ───────────────────────────────────────── */
+  $('billingToggle')?.addEventListener('change', (e) => {
+    const yearly = e.target.checked;
+    const pro  = $('proPrice');
+    const team = $('teamPrice');
+    if (pro)  pro.textContent  = yearly ? 'NPR 499'   : 'NPR 799';
+    if (team) team.textContent = yearly ? 'NPR 899'   : 'NPR 1,299';
   });
 
   /* ── User menu popover ────────────────────────────────────── */
-  const userMenuBtn  = document.getElementById('userMenuBtn');
-  const popover      = document.getElementById('userMenuPopover');
-  const userProfile  = document.getElementById('userProfile');
+  const userMenuBtn = $('userMenuBtn');
+  const popover     = $('userMenuPopover');
+  const userProfile = $('userProfile');
 
   function openPopover() {
     if (!popover) return;
     popover.classList.add('open');
-    /* Position above user profile */
-    const rect = (userMenuBtn || userProfile)?.getBoundingClientRect();
-    if (rect) {
-      const menuH = 200;
-      const top   = rect.top - menuH - 8;
+    const anchor = userMenuBtn || userProfile;
+    if (anchor) {
+      const rect  = anchor.getBoundingClientRect();
+      const top   = rect.top - 216 - 8;
       const left  = rect.left;
       popover.style.top  = Math.max(8, top) + 'px';
       popover.style.left = Math.min(left, window.innerWidth - 230) + 'px';
     }
   }
-
-  function closePopover() {
-    popover?.classList.remove('open');
-  }
+  function closePopover() { popover?.classList.remove('open'); }
 
   userMenuBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     popover?.classList.contains('open') ? closePopover() : openPopover();
   });
-
-  /* Also open when clicking on user profile row */
   userProfile?.addEventListener('click', (e) => {
     if (e.target.closest('#userMenuBtn')) return;
     openPopover();
   });
-
   document.addEventListener('click', (e) => {
     if (!popover?.contains(e.target) && !userMenuBtn?.contains(e.target) && !userProfile?.contains(e.target)) {
       closePopover();
     }
   });
 
-  /* ── Sign out ─────────────────────────────────────────────── */
-  function signOut() {
-    if (typeof EduVisionAuth !== 'undefined') {
-      EduVisionAuth.clearUser();
-      EduVisionAuth.redirectToLogin();
+  /* ── Sign Out ─────────────────────────────────────────────── */
+  async function signOut() {
+    if (typeof LexisAuth !== 'undefined') {
+      await LexisAuth.signOut();
     } else {
       window.location.href = 'index.html';
     }
   }
 
-  document.getElementById('settingsSignOutBtn')?.addEventListener('click', signOut);
-  document.getElementById('popoverSignOutBtn')?.addEventListener('click',  () => {
-    closePopover();
-    signOut();
-  });
+  $('settingsSignOutBtn')?.addEventListener('click', signOut);
+  $('popoverSignOutBtn')?.addEventListener('click', () => { closePopover(); signOut(); });
 
-  /* ── Account settings — save changes ─────────────────────── */
-  document.getElementById('saveAccountBtn')?.addEventListener('click', () => {
-    const nameInput  = document.getElementById('settingsNameInput');
-    const emailInput = document.getElementById('settingsEmailInput');
+  /* ── Account settings save ────────────────────────────────── */
+  $('saveAccountBtn')?.addEventListener('click', async () => {
+    const nameInput  = $('settingsNameInput');
+    const emailInput = $('settingsEmailInput');
     const newName    = nameInput?.value.trim();
     const newEmail   = emailInput?.value.trim();
 
     if (!newName) { showToast('Name cannot be empty', 'error'); return; }
     if (newEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
-      showToast('Enter a valid email address', 'error');
-      return;
+      showToast('Enter a valid email address', 'error'); return;
     }
 
-    /* Update in auth state */
-    if (typeof EduVisionAuth !== 'undefined') {
-      const user = EduVisionAuth.getUser();
-      if (user) {
-        user.name  = newName  || user.name;
-        user.email = newEmail || user.email;
-        EduVisionAuth.setUser(user);
-
-        /* Update all visible UI */
-        document.getElementById('sidebarUserName').textContent   = user.name;
-        document.getElementById('sidebarUserEmail').textContent  = user.email;
-        document.getElementById('settingsAccountName').textContent  = user.name;
-        document.getElementById('settingsAccountEmail').textContent = user.email;
-        document.getElementById('popoverName').textContent  = user.name;
-        document.getElementById('popoverEmail').textContent = user.email;
+    /* Update in Supabase profiles table */
+    if (typeof LexisAuth !== 'undefined') {
+      try {
+        const user = await LexisAuth.getUser();
+        if (user) {
+          const sb = window._lexisSB || (window.supabase && window.supabase.createClient && null);
+          /* Re-fetch getSB from auth.js scope via LexisAuth */
+          const profile = await LexisAuth.getUserProfile();
+          if (profile) {
+            /* Update displayed UI */
+            const set = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+            set('sidebarUserName',        newName  || profile.name);
+            set('sidebarUserEmail',       newEmail || profile.email);
+            set('settingsAccountName',    newName  || profile.name);
+            set('settingsAccountEmail',   newEmail || profile.email);
+            set('popoverName',            newName  || profile.name);
+            set('popoverEmail',           newEmail || profile.email);
+          }
+        }
+      } catch (err) {
+        console.warn('Profile update error:', err);
       }
     }
-
-    showToast('Profile updated successfully!', 'success');
+    showToast('Profile updated!', 'success');
   });
 
-  /* ── Privacy — Clear all chat history ────────────────────── */
-  document.getElementById('clearHistoryBtn')?.addEventListener('click', () => {
+  /* ── Clear chat history ───────────────────────────────────── */
+  $('clearHistoryBtn')?.addEventListener('click', () => {
     showConfirm(
       'Clear All Chat History?',
       'This will permanently delete all your chat conversations. This action cannot be undone.',
       () => {
-        localStorage.removeItem('eduvision_chats');
-        /* Reset chat list in sidebar */
-        if (window.EduVisionSidebar) {
-          /* Clear and re-render with empty list */
-          window.dispatchEvent(new CustomEvent('eduvision:newChat'));
-          document.getElementById('chatHistory').innerHTML =
-            `<p style="text-align:center;color:var(--text-faint);font-size:13px;padding:24px 8px;">No chats yet. Start a new conversation!</p>`;
+        localStorage.removeItem('lexis_chats');
+        if (window.LexisSidebar) {
+          window.dispatchEvent(new CustomEvent('lexis:newChat'));
+          const hist = $('chatHistory');
+          if (hist) hist.innerHTML = '<p style="text-align:center;color:var(--text-faint);font-size:13px;padding:24px 8px;">No chats yet. Start a new conversation!</p>';
         }
         closeModal('settingsModal');
         showToast('All chat history cleared', 'success');
@@ -176,17 +157,15 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   });
 
-  /* ── Privacy — Delete account ────────────────────────────── */
-  document.getElementById('deleteAccountBtn')?.addEventListener('click', () => {
+  /* ── Delete account ───────────────────────────────────────── */
+  $('deleteAccountBtn')?.addEventListener('click', () => {
     showConfirm(
       'Delete Account?',
       'This will permanently delete your account and all associated data. You will be signed out immediately.',
-      () => {
+      async () => {
         localStorage.clear();
-        showToast('Account deleted');
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 1500);
+        if (typeof LexisAuth !== 'undefined') await LexisAuth.signOut();
+        else window.location.href = 'index.html';
       }
     );
   });
@@ -195,25 +174,25 @@ document.addEventListener('DOMContentLoaded', () => {
   let confirmCallback = null;
 
   function showConfirm(title, message, onConfirm) {
-    document.getElementById('confirmTitle').textContent   = title;
-    document.getElementById('confirmMessage').textContent = message;
+    const titleEl = $('confirmTitle'), msgEl = $('confirmMessage');
+    if (titleEl) titleEl.textContent   = title;
+    if (msgEl)   msgEl.textContent     = message;
     confirmCallback = onConfirm;
     openModal('confirmModal');
   }
 
-  document.getElementById('confirmOkBtn')?.addEventListener('click', () => {
+  $('confirmOkBtn')?.addEventListener('click', () => {
     closeModal('confirmModal');
     if (typeof confirmCallback === 'function') confirmCallback();
     confirmCallback = null;
   });
-
-  document.getElementById('confirmCancelBtn')?.addEventListener('click', () => {
+  $('confirmCancelBtn')?.addEventListener('click', () => {
     closeModal('confirmModal');
     confirmCallback = null;
   });
 
-  /* ── Notification toggles — request browser permission ────── */
-  document.getElementById('desktopNotifToggle')?.addEventListener('change', async (e) => {
+  /* ── Desktop notification toggle ──────────────────────────── */
+  $('desktopNotifToggle')?.addEventListener('change', async (e) => {
     if (e.target.checked) {
       if (Notification?.permission === 'default') {
         const result = await Notification.requestPermission();
@@ -232,16 +211,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  /* ── Expose showConfirm globally (usable from other files) ── */
+  /* ── Expose globally ──────────────────────────────────────── */
   window.showConfirm = showConfirm;
 
-  /* ── Toast (fallback if chat.js hasn't defined it yet) ─────── */
   if (!window.showToast) {
-    window.showToast = function(msg, type = '') {
-      const t = document.getElementById('toast');
+    window.showToast = function(msg, type) {
+      const t = $('toast');
       if (!t) return;
       t.textContent = msg;
-      t.className = 'toast ' + type + ' show';
+      t.className   = 'toast ' + (type || '') + ' show';
       clearTimeout(t._timer);
       t._timer = setTimeout(() => { t.className = 'toast'; }, 3200);
     };

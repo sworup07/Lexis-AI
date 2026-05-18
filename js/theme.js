@@ -3,8 +3,8 @@
    All theme state is persisted to localStorage automatically.
 ═══════════════════════════════════════════════════════════════ */
 
-const EduVisionTheme = (() => {
-  /* Accent color definitions */
+const LexisTheme = (() => {
+
   const ACCENTS = {
     cyan:   { accent:'#00d4ff', dim:'rgba(0,212,255,0.12)',  glow:'rgba(0,212,255,0.3)',  text:'#000' },
     violet: { accent:'#7c3aed', dim:'rgba(124,58,237,0.12)', glow:'rgba(124,58,237,0.3)', text:'#fff' },
@@ -13,31 +13,26 @@ const EduVisionTheme = (() => {
     pink:   { accent:'#ec4899', dim:'rgba(236,72,153,0.12)', glow:'rgba(236,72,153,0.3)', text:'#fff' },
   };
 
-  let currentTheme  = localStorage.getItem('eduvision-theme')  || 'dark';
-  let currentAccent = localStorage.getItem('eduvision-accent') || 'cyan';
+  let currentTheme  = localStorage.getItem('lexis-theme')  || 'dark';
+  let currentAccent = localStorage.getItem('lexis-accent') || 'cyan';
 
-  /* ── Apply theme ─────────────────────────────────────────── */
   function applyTheme(theme) {
     currentTheme = theme;
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
-    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
 
-    /* Update topbar icons */
-    const sunIcon  = document.getElementById('topbarSunIcon');
-    const moonIcon = document.getElementById('topbarMoonIcon');
-    if (sunIcon)  sunIcon.style.display  = isDark ? 'none' : '';
-    if (moonIcon) moonIcon.style.display = isDark ? ''     : 'none';
+    const sun  = document.getElementById('topbarSunIcon');
+    const moon = document.getElementById('topbarMoonIcon');
+    if (sun)  sun.style.display  = dark ? 'none' : '';
+    if (moon) moon.style.display = dark ? '' : 'none';
 
-    /* Highlight active theme option buttons across all pickers */
     document.querySelectorAll('[data-theme-option]').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.themeOption === theme);
     });
 
-    localStorage.setItem('eduvision-theme', theme);
+    localStorage.setItem('lexis-theme', theme);
   }
 
-  /* ── Apply accent color ──────────────────────────────────── */
   function applyAccent(colorKey) {
     const c = ACCENTS[colorKey];
     if (!c) return;
@@ -48,41 +43,41 @@ const EduVisionTheme = (() => {
     root.style.setProperty('--accent-glow', c.glow);
     root.style.setProperty('--accent-text', c.text);
 
-    /* Sync all swatch buttons */
     document.querySelectorAll('.swatch').forEach(s => {
       s.classList.toggle('active', s.dataset.color === colorKey);
     });
 
-    localStorage.setItem('eduvision-accent', colorKey);
+    localStorage.setItem('lexis-accent', colorKey);
   }
 
-  /* ── Apply font size ─────────────────────────────────────── */
   function applyFontSize(px) {
     document.documentElement.style.setProperty('--font-size', px + 'px');
     document.querySelectorAll('.font-size-btn').forEach(btn => {
       btn.classList.toggle('active', parseInt(btn.dataset.size) === parseInt(px));
     });
-    localStorage.setItem('eduvision-fontsize', px);
+    localStorage.setItem('lexis-fontsize', px);
   }
 
-  /* ── Init ────────────────────────────────────────────────── */
   function init() {
     applyTheme(currentTheme);
     applyAccent(currentAccent);
-    const savedFontSize = localStorage.getItem('eduvision-fontsize');
-    if (savedFontSize) applyFontSize(savedFontSize);
+    const savedSize = localStorage.getItem('lexis-fontsize');
+    if (savedSize) applyFontSize(savedSize);
 
-    /* Listen for system theme changes when using "system" mode */
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
       if (currentTheme === 'system') applyTheme('system');
     });
 
-    /* Topbar theme toggle button */
     document.getElementById('topbarThemeBtn')?.addEventListener('click', () => {
       applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
     });
 
-    /* All [data-theme-option] buttons */
+    document.querySelectorAll('[data-toggle-theme]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+      });
+    });
+
     document.addEventListener('click', (e) => {
       const themeBtn = e.target.closest('[data-theme-option]');
       if (themeBtn) applyTheme(themeBtn.dataset.themeOption);
@@ -98,5 +93,7 @@ const EduVisionTheme = (() => {
   return { init, applyTheme, applyAccent, applyFontSize, getTheme: () => currentTheme, getAccent: () => currentAccent };
 })();
 
-/* Auto-init when DOM is ready */
-document.addEventListener('DOMContentLoaded', () => EduVisionTheme.init());
+/* Alias for any legacy references */
+const EduVisionTheme = LexisTheme;
+
+document.addEventListener('DOMContentLoaded', () => LexisTheme.init());

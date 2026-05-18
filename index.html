@@ -3,11 +3,71 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EduVision Nepal AI — Sign In</title>
-  <meta name="description" content="Smart Educational AI for Nepalese Students" />
+
+  <!-- ═══ PRIMARY SEO ═══ -->
+  <title>Lexis AI — Smart Educational Chatbot for Nepalese Students</title>
+  <meta name="description" content="Lexis AI is Nepal's most intelligent educational chatbot. Master the CDC curriculum, ace NEB exams, find scholarships, and get personalized AI tutoring — all in one place." />
+  <meta name="keywords" content="Nepal AI tutor, NEB exam preparation, CDC curriculum Nepal, educational chatbot Nepal, scholarship finder Nepal, Grade 12 science notes, IOE entrance exam, Lexis AI" />
+  <meta name="author" content="Lexis AI Nepal" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://lexis-np.netlify.app/index.html" />
+
+  <!-- ═══ OPEN GRAPH (Facebook, LinkedIn, WhatsApp) ═══ -->
+  <meta property="og:type"        content="website" />
+  <meta property="og:url"         content="https://lexis-np.netlify.app/index.html" />
+  <meta property="og:title"       content="Lexis AI — Smart Educational Chatbot for Nepalese Students" />
+  <meta property="og:description" content="Join 50,000+ Nepalese students using Lexis AI to master the CDC curriculum, ace NEB exams, and find scholarships with personalised AI tutoring." />
+  <meta property="og:image"       content="https://lexis-np.netlify.app/og-image.png" />
+  <meta property="og:locale"      content="en_NP" />
+  <meta property="og:site_name"   content="Lexis AI" />
   <meta name="google-site-verification" content="29ZSYDr7bgHMgVVTycfFZmWXpV1KStxvbchEfIYFiKU" />
+
+  <!-- ═══ TWITTER / X CARD ═══ -->
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:site"        content="@LexisAINepal" />
+  <meta name="twitter:title"       content="Lexis AI — Smart Educational Chatbot for Nepalese Students" />
+  <meta name="twitter:description" content="Nepal's most intelligent educational chatbot. CDC notes, NEB prep, scholarship matching — powered by AI." />
+  <meta name="twitter:image"       content="https://lexis-np.netlify.app/og-image.png" />
+
+  <!-- ═══ STRUCTURED DATA (JSON-LD) ═══ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Lexis AI",
+    "url": "https://lexis-np.netlify.app/index.html",
+    "description": "Nepal's most intelligent educational AI chatbot for NEB exam preparation, CDC curriculum notes, and scholarship discovery.",
+    "applicationCategory": "EducationApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "NPR"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "Lexis AI Nepal",
+      "url": "https://lexis-np.netlify.app/index.html"
+    },
+    "audience": {
+      "@type": "EducationalAudience",
+      "educationalRole": "student",
+      "geographicArea": "Nepal"
+    }
+  }
+  </script>
+
+  <!-- ═══ FAVICONS ═══ -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+
+  <!-- ═══ FONTS ═══ -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- ═══ GOOGLE IDENTITY SERVICES ═══ -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <link rel="stylesheet" href="css/shared.css" />
   <link rel="stylesheet" href="css/login.css" />
 </head>
@@ -15,45 +75,46 @@
 
 <div class="login-app" id="loginApp">
 
-  <!-- Left Panel — Branding -->
-  <div class="login-left">
+  <!-- ══ LEFT PANEL — Branding ══ -->
+  <div class="login-left" role="complementary" aria-label="Product information">
     <div class="login-left-inner">
+
       <!-- Logo -->
       <div class="login-logo">
-        <div class="login-logo-icon">
+        <div class="login-logo-icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
         </div>
-        <span class="login-logo-text">EduVision <span class="accent">AI</span></span>
+        <span class="login-logo-text">Lexis <span class="accent">AI</span></span>
       </div>
 
       <!-- Main copy -->
       <div class="login-copy">
         <div class="login-badge">Your AI Study Partner</div>
         <h1>Learn Smarter.<br /><span class="accent">Score Higher.</span></h1>
-        <p>Join 50,000+ Nepalese students mastering the CDC curriculum, acing NEB exams, and finding scholarships with AI.</p>
+        <p>Join 50,000+ Nepalese students mastering the CDC curriculum, acing NEB exams, and finding scholarships with Lexis AI.</p>
       </div>
 
       <!-- Feature pills -->
-      <div class="login-features">
-        <div class="feature-pill">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <div class="login-features" role="list" aria-label="Key features">
+        <div class="feature-pill" role="listitem">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           AI-Powered Tutoring
         </div>
-        <div class="feature-pill">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <div class="feature-pill" role="listitem">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           CDC Curriculum Notes
         </div>
-        <div class="feature-pill">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+        <div class="feature-pill" role="listitem">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
           Scholarship Finder
         </div>
       </div>
 
       <!-- Testimonial -->
       <blockquote class="login-testimonial">
-        <p>"EduVision AI changed how I study. I went from C grades to distinction in one semester. The AI explains everything in a way that makes sense."</p>
+        <p>"Lexis AI changed how I study. I went from C grades to distinction in one semester. The AI explains everything in a way that actually makes sense."</p>
         <div class="testimonial-author">
-          <img src="https://i.pravatar.cc/100?img=12" alt="Student" class="testimonial-avatar" />
+            <img src="images/purnima.JPG" alt="Purnima K.C., Grade 12 Science student from Pokhara, head-and-shoulders portrait with a warm confident smile, neutral indoor background, no readable text present, conveys pride and satisfaction" class="testimonial-avatar" width="36" height="36" />
           <div>
             <strong>Purnima K.C.</strong>
             <span>Grade 12 Science, Pokhara</span>
@@ -63,24 +124,50 @@
     </div>
   </div>
 
-  <!-- Right Panel — Sign In Form -->
-  <div class="login-right">
+  <!-- ══ RIGHT PANEL — Sign In Form ══ -->
+  <div class="login-right" role="main">
     <div class="login-form-wrap">
 
-      <!-- Theme toggle (top right) -->
-      <button class="theme-toggle-btn" id="loginThemeBtn" title="Toggle theme">
-        <svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <!-- Theme toggle -->
+      <button class="theme-toggle-btn" id="loginThemeBtn" title="Toggle theme" aria-label="Toggle light/dark theme">
+        <svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
 
       <div class="login-form-header">
-        <h2>Welcome to EduVision</h2>
+        <h2>Welcome to Lexis AI</h2>
         <p>Sign in or create an account to start learning</p>
       </div>
 
-      <!-- Google Sign-In -->
-      <button class="btn-google" id="googleSignInBtn">
-        <!-- Google Logo SVG -->
+      <!-- ══ GOOGLE SIGN-IN ══
+           Two options are provided below:
+           OPTION A (recommended): Google One Tap / GIS button — uses the
+                    official Google Identity Services SDK loaded in <head>.
+                    Replace YOUR_GOOGLE_CLIENT_ID with your OAuth 2.0 Client ID
+                    from https://console.cloud.google.com/
+           OPTION B: Custom styled button that triggers google.accounts.id.prompt()
+      -->
+
+      <!-- OPTION A: Official GIS rendered button (uncomment + set client ID) -->
+      <!--
+      <div id="g_id_onload"
+           data-client_id="YOUR_GOOGLE_CLIENT_ID"
+           data-callback="handleGoogleSignIn"
+           data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+           data-type="standard"
+           data-shape="rectangular"
+           data-theme="outline"
+           data-text="continue_with"
+           data-size="large"
+           data-logo_alignment="left"
+           data-width="360">
+      </div>
+      -->
+
+      <!-- OPTION B: Custom styled button (default — works with mock + real GIS) -->
+      <button class="btn-google" id="googleSignInBtn" aria-label="Continue with Google">
         <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
           <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -88,40 +175,40 @@
           <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
         </svg>
         <span id="googleBtnText">Continue with Google</span>
-        <div class="btn-spinner" id="googleSpinner" style="display:none"></div>
+        <div class="btn-spinner" id="googleSpinner" style="display:none" aria-hidden="true" role="status"></div>
       </button>
 
       <!-- Divider -->
-      <div class="login-divider"><span>or</span></div>
+      <div class="login-divider" role="separator"><span>or</span></div>
 
       <!-- Email form -->
-      <form class="login-email-form" id="loginEmailForm" novalidate>
+      <form class="login-email-form" id="loginEmailForm" novalidate aria-label="Email sign in form">
         <div class="form-group">
           <label for="emailInput">Email address</label>
-          <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" />
-          <span class="form-error" id="emailError"></span>
+          <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" aria-required="true" />
+          <span class="form-error" id="emailError" role="alert" aria-live="polite"></span>
         </div>
         <div class="form-group">
           <label for="passwordInput">Password</label>
           <div class="password-wrap">
-            <input type="password" id="passwordInput" placeholder="Enter your password" autocomplete="current-password" />
-            <button type="button" class="password-toggle" id="passwordToggle" title="Show/hide password">
-              <svg id="eyeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg id="eyeOffIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            <input type="password" id="passwordInput" placeholder="Enter your password" autocomplete="current-password" aria-required="true" />
+            <button type="button" class="password-toggle" id="passwordToggle" title="Show/hide password" aria-label="Toggle password visibility">
+              <svg id="eyeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg id="eyeOffIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
             </button>
           </div>
-          <span class="form-error" id="passwordError"></span>
+          <span class="form-error" id="passwordError" role="alert" aria-live="polite"></span>
         </div>
         <div class="form-forgot">
           <a href="#" id="forgotPasswordLink">Forgot password?</a>
         </div>
         <button type="submit" class="btn-email-signin" id="emailSignInBtn">
           <span id="emailBtnText">Sign In</span>
-          <div class="btn-spinner" id="emailSpinner" style="display:none"></div>
+          <div class="btn-spinner" id="emailSpinner" style="display:none" role="status" aria-label="Signing in…"></div>
         </button>
       </form>
 
-      <!-- Switch to Sign Up -->
+      <!-- Switch Sign In / Sign Up -->
       <div class="login-switch">
         <span id="switchText">Don't have an account?</span>
         <button id="switchModeBtn" class="link-btn">Sign up</button>
@@ -129,8 +216,8 @@
 
       <!-- Terms -->
       <p class="login-terms">
-        By continuing, you agree to EduVision's
-        <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+        By continuing, you agree to Lexis AI's
+        <a href="/terms" rel="noopener">Terms of Service</a> and <a href="/privacy" rel="noopener">Privacy Policy</a>.
       </p>
     </div>
   </div>
@@ -138,8 +225,18 @@
 </div>
 
 <!-- Toast notification -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<!-- Hidden div for Google One Tap (if using OPTION A) -->
+<div id="g_id_onload"
+     data-client_id="YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+     data-callback="handleGoogleSignIn"
+     data-auto_prompt="false"
+     style="display:none">
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/auth.js"></script>
 </body>
 </html>
