@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <!-- Home -->
+  <url>
+    <loc>https://lexis-np.netlify.app/</loc>
+    <lastmod>2026-05-18</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Chat -->
+  <url>
+    <loc>https://lexis-np.netlify.app/chat.html</loc>
+    <lastmod>2026-05-18</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- About -->
+  <url>
+    <loc>https://lexis-np.netlify.app/about.html</loc>
+    <lastmod>2026-05-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Privacy Policy -->
+  <url>
+    <loc>https://lexis-np.netlify.app/privacy-policy.html</loc>
+    <lastmod>2026-05-18</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Terms -->
+  <url>
+    <loc>https://lexis-np.netlify.app/terms.html</loc>
+    <lastmod>2026-05-18</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+</urlset>
