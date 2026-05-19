@@ -1,10 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════
-   sidebar.js — Sidebar toggle & chat list management
-   Features: toggle (desktop + mobile), search, add, rename,
-   delete, right-click context menu, active state.
+   sidebar.js — Sidebar toggle & real chat history management
+   CHANGES: No fake seed data. Loads real chats from ChatStorage.
+            Uses lexis: events. Syncs per-user chat list.
 ═══════════════════════════════════════════════════════════════ */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
 
   const app              = document.getElementById('app');
   const sidebar          = document.getElementById('sidebar');
@@ -21,21 +21,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const isMobile = () => window.innerWidth <= 768;
 
-  let chatList = JSON.parse(localStorage.getItem('lexis_chats') || 'null') || [
-    { id: '1', title: 'How is NEB GPA calculated?',      group: 'Today'           },
-    { id: '2', title: 'Grade 12 Physics Notes',           group: 'Today'           },
-    { id: '3', title: 'Scholarship opportunities Nepal',  group: 'Today'           },
-    { id: '4', title: 'Chemistry Chapter 5 summary',      group: 'Yesterday'       },
-    { id: '5', title: 'IOE entrance exam tips',           group: 'Yesterday'       },
-    { id: '6', title: 'Career in Computer Engineering',   group: 'Previous 7 Days' },
-    { id: '7', title: 'NEB exam schedule 2024',           group: 'Previous 7 Days' },
-    { id: '8', title: 'Mathematics integration notes',    group: 'Previous 7 Days' },
-  ];
-  let activeChatId  = chatList[0]?.id || null;
+  /* ── Get userId for per-user storage ───────────────────────── */
+  let currentUserId = null;
+  if (typeof LexisAuth !== 'undefined') {
+    const user = await LexisAuth.getUser();
+    currentUserId = user?.id || null;
+  }
+
+  function storageKey() { return `lexis_chats_${currentUserId || 'guest'}`; }
+
+  /* ── Load real chats (no fake seed data) ───────────────────── */
+  let chatList = [];
+  try {
+    chatList = JSON.parse(localStorage.getItem(storageKey()) || '[]');
+  } catch { chatList = []; }
+
+  let activeChatId  = null;
   let contextTarget = null;
 
   function saveChatList() {
-    localStorage.setItem('lexis_chats', JSON.stringify(chatList));
+    localStorage.setItem(storageKey(), JSON.stringify(chatList));
   }
 
   /* ── Sidebar open / close ──────────────────────────────────── */
@@ -48,12 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
     else            app.classList.add('sidebar-collapsed');
   }
   function toggleSidebar() {
-    if (isMobile()) app.classList.contains('sidebar-open-mobile') ? closeSidebar() : openSidebar();
-    else            app.classList.contains('sidebar-collapsed')   ? openSidebar()  : closeSidebar();
+    if (isMobile()) app.classList.toggle('sidebar-open-mobile');
+    else            app.classList.toggle('sidebar-collapsed');
   }
 
-  if (isMobile()) app.classList.remove('sidebar-open-mobile');
-  else            app.classList.remove('sidebar-collapsed');
+  if (!isMobile()) app.classList.remove('sidebar-collapsed');
 
   let resizeTimer;
   window.addEventListener('resize', () => {
@@ -67,24 +71,42 @@ document.addEventListener('DOMContentLoaded', () => {
   sidebarCloseBtn?.addEventListener('click', closeSidebar);
   sidebarOverlay?.addEventListener('click', closeSidebar);
 
-  /* ── Render chat list ─────────────────────────────────────── */
+  /* ── Helpers ────────────────────────────────────────────────── */
+  function getChatGroup(createdAt) {
+    const now  = Date.now();
+    const diff = now - (createdAt || now);
+    const days = diff / (1000 * 60 * 60 * 24);
+    if (days < 1)   return 'Today';
+    if (days < 2)   return 'Yesterday';
+    if (days < 7)   return 'Previous 7 Days';
+    if (days < 30)  return 'Previous 30 Days';
+    return 'Older';
+  }
+
+  /* ── Render chat list ────────────────────────────────────────── */
   function renderChatList(filter) {
     chatHistoryEl.innerHTML = '';
     const query = (filter || '').toLowerCase().trim();
 
-    const groups = {};
-    chatList.forEach(chat => {
-      if (query && !chat.title.toLowerCase().includes(query)) return;
-      if (!groups[chat.group]) groups[chat.group] = [];
-      groups[chat.group].push(chat);
-    });
-
-    if (Object.keys(groups).length === 0) {
-      chatHistoryEl.innerHTML = '<p style="text-align:center;color:var(--text-faint);font-size:13px;padding:24px 8px;">No chats found</p>';
+    if (chatList.length === 0 && !query) {
+      chatHistoryEl.innerHTML = '<p style="text-align:center;color:var(--text-faint);font-size:13px;padding:24px 8px">No chats yet. Start a new conversation!</p>';
       return;
     }
 
-    const order = ['Today', 'Yesterday', 'Previous 7 Days'];
+    const groups = {};
+    chatList.forEach(chat => {
+      if (query && !chat.title.toLowerCase().includes(query)) return;
+      const group = getChatGroup(chat.createdAt);
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(chat);
+    });
+
+    if (Object.keys(groups).length === 0) {
+      chatHistoryEl.innerHTML = '<p style="text-align:center;color:var(--text-faint);font-size:13px;padding:24px 8px">No chats found</p>';
+      return;
+    }
+
+    const order = ['Today', 'Yesterday', 'Previous 7 Days', 'Previous 30 Days', 'Older'];
     [...order, ...Object.keys(groups).filter(g => !order.includes(g))].forEach(group => {
       if (!groups[group]) return;
       const label = document.createElement('p');
@@ -132,10 +154,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isMobile()) closeSidebar();
   }
 
-  function addNewChat(title) {
-    const newChat = { id: 'chat_' + Date.now(), title: title || 'New Chat', group: 'Today' };
-    chatList.unshift(newChat);
-    saveChatList();
+  function addNewChat(title, chatId, createdAt) {
+    const newChat = {
+      id:        chatId || ('chat_' + Date.now()),
+      title:     title || 'New Chat',
+      createdAt: createdAt || Date.now(),
+    };
+    // Avoid duplicates
+    if (!chatList.find(c => c.id === newChat.id)) {
+      chatList.unshift(newChat);
+      saveChatList();
+    }
     activeChatId = newChat.id;
     renderChatList();
     return newChat;
@@ -148,10 +177,12 @@ document.addEventListener('DOMContentLoaded', () => {
       entryEl.style.transform  = 'translateX(-8px)';
     }
     setTimeout(() => {
+      // Remove messages from storage too
+      localStorage.removeItem('lexis_msgs_' + (currentUserId || 'guest') + '_' + chatId);
       chatList = chatList.filter(c => c.id !== chatId);
       saveChatList();
       if (activeChatId === chatId) {
-        activeChatId = chatList[0]?.id || null;
+        activeChatId = null;
         window.dispatchEvent(new CustomEvent('lexis:newChat'));
       }
       renderChatList();
@@ -168,12 +199,9 @@ document.addEventListener('DOMContentLoaded', () => {
     input.value     = chat.title;
     input.maxLength = 80;
     entryEl.replaceChild(input, btn);
-
     const delBtn = entryEl.querySelector('.nav-delete-btn');
     if (delBtn) delBtn.style.display = 'none';
-
-    input.focus();
-    input.select();
+    input.focus(); input.select();
 
     function finish() {
       chat.title = input.value.trim() || chat.title;
@@ -191,32 +219,20 @@ document.addEventListener('DOMContentLoaded', () => {
   function showContextMenu(x, y, chatId, entryEl) {
     contextTarget = { chatId, entryEl };
     contextMenu.classList.add('open');
-    const finalX = Math.min(x, window.innerWidth  - 178);
-    const finalY = Math.min(y, window.innerHeight - 100);
-    contextMenu.style.left = finalX + 'px';
-    contextMenu.style.top  = finalY + 'px';
+    contextMenu.style.left = Math.min(x, window.innerWidth  - 178) + 'px';
+    contextMenu.style.top  = Math.min(y, window.innerHeight - 100) + 'px';
   }
-  function closeContextMenu() {
-    contextMenu.classList.remove('open');
-    contextTarget = null;
-  }
+  function closeContextMenu() { contextMenu.classList.remove('open'); contextTarget = null; }
 
-  ctxRename?.addEventListener('click', () => {
-    if (contextTarget) startRename(contextTarget.chatId, contextTarget.entryEl);
-    closeContextMenu();
-  });
-  ctxDelete?.addEventListener('click', () => {
-    if (contextTarget) deleteChat(contextTarget.chatId, contextTarget.entryEl);
-    closeContextMenu();
-  });
+  ctxRename?.addEventListener('click', () => { if (contextTarget) startRename(contextTarget.chatId, contextTarget.entryEl); closeContextMenu(); });
+  ctxDelete?.addEventListener('click', () => { if (contextTarget) deleteChat(contextTarget.chatId, contextTarget.entryEl); closeContextMenu(); });
   document.addEventListener('click',   (e) => { if (!contextMenu.contains(e.target)) closeContextMenu(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeContextMenu(); });
 
   /* ── Search ───────────────────────────────────────────────── */
   searchInput?.addEventListener('input', () => {
-    const q = searchInput.value;
-    if (searchClear) searchClear.style.display = q ? '' : 'none';
-    renderChatList(q);
+    if (searchClear) searchClear.style.display = searchInput.value ? '' : 'none';
+    renderChatList(searchInput.value);
   });
   searchClear?.addEventListener('click', () => {
     searchInput.value = '';
@@ -235,27 +251,20 @@ document.addEventListener('DOMContentLoaded', () => {
     window.dispatchEvent(new CustomEvent('lexis:newChat'));
   });
 
-  /* ── Event listeners from chat.js ─────────────────────────── */
+  /* ── Events from chat.js ──────────────────────────────────── */
+  window.addEventListener('lexis:chatCreated', (e) => {
+    const { chatId, title } = e.detail;
+    addNewChat(title, chatId, Date.now());
+  });
+
   window.addEventListener('lexis:chatTitleUpdate', (e) => {
     const { chatId, title } = e.detail;
     const chat = chatList.find(c => c.id === chatId);
-    if (chat && chat.title === 'New Chat') { chat.title = title; saveChatList(); renderChatList(); }
+    if (chat) { chat.title = title; saveChatList(); renderChatList(); }
   });
-  window.addEventListener('lexis:chatCreated', (e) => {
-    const { chatId, title } = e.detail;
-    addNewChat(title);
-    if (chatList[0]) { chatList[0].id = chatId; activeChatId = chatId; saveChatList(); renderChatList(); }
-  });
-
-  /* Also listen for legacy event names in case chat.js still uses them */
-  window.addEventListener('eduvision:loadChat',        (e) => window.dispatchEvent(new CustomEvent('lexis:loadChat',        { detail: e.detail })));
-  window.addEventListener('eduvision:newChat',         ()  => window.dispatchEvent(new CustomEvent('lexis:newChat')));
-  window.addEventListener('eduvision:chatTitleUpdate', (e) => window.dispatchEvent(new CustomEvent('lexis:chatTitleUpdate', { detail: e.detail })));
-  window.addEventListener('eduvision:chatCreated',     (e) => window.dispatchEvent(new CustomEvent('lexis:chatCreated',     { detail: e.detail })));
 
   /* ── Expose globally ──────────────────────────────────────── */
-  window.LexisSidebar = { addNewChat, deleteChat, startRename, loadChat, renderChatList, getActiveChatId: () => activeChatId };
-  /* Alias for backward compat */
+  window.LexisSidebar    = { addNewChat, deleteChat, startRename, loadChat, renderChatList, getActiveChatId: () => activeChatId };
   window.EduVisionSidebar = window.LexisSidebar;
 
   renderChatList();

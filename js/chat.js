@@ -1,72 +1,250 @@
 /* ═══════════════════════════════════════════════════════════════
-   chat.js — Chat messages, streaming, voice input
-   
-   TO CONNECT YOUR AI API:
-   Replace simulateStreaming() with a real fetch() call.
-   Example is in the sendMessage() function comments.
+   chat.js — Lexis AI Chat Interface
+   ─────────────────────────────────────────────────────────────
+   CHANGES FROM PREVIOUS VERSION:
+   • Removed all fake AI_RESPONSES hardcoded data
+   • Removed fake chat history from sidebar seed data
+   • Real chat history persisted to localStorage per user
+   • AI responses come from a real API (OpenRouter free tier by
+     default — swap API_CONFIG below for your own backend)
+   • Events renamed from eduvision: → lexis: consistently
+   • Auth uses async LexisAuth (Supabase) properly
+   • User avatar is fetched from Supabase session
+   ─────────────────────────────────────────────────────────────
+   TO CONNECT YOUR OWN AI BACKEND:
+   Set API_CONFIG.endpoint to your URL and update buildPayload()
+   to match your API's request format.
 ═══════════════════════════════════════════════════════════════ */
 
-document.addEventListener('DOMContentLoaded', () => {
-  if (!document.getElementById('chatArea')) return;
+/* ── AI API Configuration ────────────────────────────────────
+   Using OpenRouter (free tier, no credit card needed):
+   1. Sign up at https://openrouter.ai
+   2. Copy your API key → paste into API_KEY below
+   3. Choose any free model from https://openrouter.ai/models
 
-  /* Auth guard — redirect to login if not signed in */
-  if (typeof EduVisionAuth !== 'undefined' && !EduVisionAuth.isLoggedIn()) {
-    EduVisionAuth.redirectToLogin();
-    return;
+   To use your own backend later:
+   • Set endpoint to your server URL e.g. 'https://api.yoursite.com/chat'
+   • Set provider to 'custom'
+   • Update buildPayload() and parseResponse() below
+─────────────────────────────────────────────────────────────── */
+const API_CONFIG = {
+  provider: 'openrouter',
+  endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+  apiKey:   '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',
+  model:    'poolside/laguna-m.1:free',   // ← updated to available free model
+};
+
+/* System prompt — defines how Lexis AI behaves */
+const SYSTEM_PROMPT = `
+You are Lexis AI, an intelligent academic assistant designed specifically for Nepali students.
+You were created by a Nepali student developer, Sworup Pokhrel.
+
+Your primary role is to act as a strict but helpful educational tutor.
+
+════════════════════════════════════
+🎯 CORE EXPERTISE
+════════════════════════════════════
+You specialize in:
+
+- Nepal CDC curriculum (Grade 11 & 12 Science, Management, Humanities)
+- NEB exam preparation, past paper analysis, and marking patterns
+- GPA calculation system used in Nepal (A+, A, B+, B, C+, C, D, NG)
+- IOE engineering entrance preparation
+- Medical entrance (IOM) and other competitive exams in Nepal
+- Scholarships (government + international opportunities for Nepali students)
+- Study planning, revision strategies, and exam techniques
+
+════════════════════════════════════
+📚 RESPONSE RULES
+════════════════════════════════════
+- Always prioritize Nepal CDC + NEB context first
+- Always explain answers in an exam-oriented way
+- Use simple, clear, structured English
+- Provide step-by-step explanations for math/science problems
+- Give Nepal-relevant examples whenever possible
+- Keep answers useful for Grade 11–12 students
+- If the topic is outside academics, gently redirect back to education
+
+════════════════════════════════════
+🧠 TEACHING STYLE
+════════════════════════════════════
+- Be like a patient classroom teacher
+- Focus on understanding, not just answers
+- Break complex ideas into simple steps
+- Use bullet points when helpful
+- Avoid unnecessary long storytelling
+
+════════════════════════════════════
+🚫 RESTRICTIONS
+════════════════════════════════════
+- Do NOT provide unrelated entertainment or random facts unless asked
+- Do NOT drift away from academic purpose
+- Do NOT assume foreign syllabus unless user requests it
+- If unsure, default to Nepal CDC context
+
+════════════════════════════════════
+🎓 GOAL
+════════════════════════════════════
+Help Nepali students understand concepts clearly, score better in exams, and build strong academic foundations.
+
+Always respond in helpful, structured English.
+`;
+
+/* ─────────────────────────────────────────────────────────────
+   Build the request payload for the AI API
+─────────────────────────────────────────────────────────────── */
+function buildPayload(conversationHistory) {
+  if (API_CONFIG.provider === 'openrouter' || API_CONFIG.provider === 'custom') {
+    return {
+      model: API_CONFIG.model,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...conversationHistory,
+      ],
+      stream: false,  // set to true if your endpoint supports SSE streaming
+      max_tokens: 1024,
+    };
+  }
+  // Add more providers here as needed
+  return {};
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Parse the response from the AI API
+─────────────────────────────────────────────────────────────── */
+function parseResponse(json) {
+  // OpenAI-compatible format (OpenRouter, most providers)
+  return json?.choices?.[0]?.message?.content || 'Sorry, I could not generate a response. Please try again.';
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Call the AI API
+─────────────────────────────────────────────────────────────── */
+async function callAI(conversationHistory, signal) {
+  let res;
+  try {
+    res = await fetch(API_CONFIG.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + API_CONFIG.apiKey,
+        'HTTP-Referer':  window.location.origin,
+        'X-Title':       'Lexis AI',
+      },
+      body:   JSON.stringify(buildPayload(conversationHistory)),
+      signal: signal,
+    });
+  } catch (networkErr) {
+    if (networkErr.name === 'AbortError') throw networkErr;
+    throw new Error('Network error — check your internet connection.');
   }
 
-  /* ── Load & display user info ─────────────────────────────── */
-  const user = (typeof EduVisionAuth !== 'undefined') ? EduVisionAuth.getUser() : null;
-  if (user) {
-    document.getElementById('sidebarUserName')?.setAttribute && (document.getElementById('sidebarUserName').textContent = user.name);
-    document.getElementById('sidebarUserEmail').textContent  = user.email;
-    document.getElementById('sidebarUserAvatar').src         = user.avatar || `https://i.pravatar.cc/100?u=${user.email}`;
-    document.getElementById('welcomeTitle').textContent      = `How can I help you today?`;
-    /* Popover */
-    document.getElementById('popoverName').textContent       = user.name;
-    document.getElementById('popoverEmail').textContent      = user.email;
-    document.getElementById('popoverAvatar').src             = user.avatar || `https://i.pravatar.cc/100?u=${user.email}`;
-    /* Settings account tab */
-    document.getElementById('settingsAvatar').src            = user.avatar || `https://i.pravatar.cc/100?u=${user.email}`;
-    document.getElementById('settingsAccountName').textContent  = user.name;
-    document.getElementById('settingsAccountEmail').textContent = user.email;
-    document.getElementById('settingsNameInput').value          = user.name;
-    document.getElementById('settingsEmailInput').value         = user.email;
-    document.getElementById('settingsPlanBadge').textContent    = user.plan === 'pro' ? 'Pro Plan' : 'Free Plan';
-    document.getElementById('planBadge').textContent            = user.plan === 'pro' ? 'Pro' : 'Free';
+  if (!res.ok) {
+    let errMsg = 'API error ' + res.status;
+    try { const j = await res.json(); errMsg = j?.error?.message || j?.message || errMsg; } catch (_) {}
+    if (res.status === 401) errMsg = 'Invalid API key. Check your key in chat.js.';
+    if (res.status === 402) errMsg = 'OpenRouter account has no credits.';
+    if (res.status === 429) errMsg = 'Rate limit hit. Wait a moment and try again.';
+    if (res.status === 503) errMsg = 'Model temporarily unavailable. Try again shortly.';
+    throw new Error(errMsg);
+  }
+
+  const json = await res.json();
+  return parseResponse(json);
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   Chat Storage — per-user chat history in localStorage
+════════════════════════════════════════════════════════════════ */
+const ChatStorage = (() => {
+  function getStorageKey(userId) {
+    return `lexis_chats_${userId || 'guest'}`;
+  }
+
+  function loadChats(userId) {
+    try {
+      return JSON.parse(localStorage.getItem(getStorageKey(userId)) || '[]');
+    } catch { return []; }
+  }
+
+  function saveChats(userId, chats) {
+    localStorage.setItem(getStorageKey(userId), JSON.stringify(chats));
+  }
+
+  function loadMessages(chatId, userId) {
+    try {
+      return JSON.parse(localStorage.getItem(`lexis_msgs_${userId}_${chatId}`) || '[]');
+    } catch { return []; }
+  }
+
+  function saveMessages(chatId, userId, messages) {
+    localStorage.setItem(`lexis_msgs_${userId}_${chatId}`, JSON.stringify(messages));
+  }
+
+  function deleteChat(chatId, userId) {
+    // Remove messages
+    localStorage.removeItem(`lexis_msgs_${userId}_${chatId}`);
+    // Remove from chat list
+    const chats = loadChats(userId).filter(c => c.id !== chatId);
+    saveChats(userId, chats);
+  }
+
+  function clearAllChats(userId) {
+    const chats = loadChats(userId);
+    chats.forEach(c => localStorage.removeItem(`lexis_msgs_${userId}_${c.id}`));
+    saveChats(userId, []);
+  }
+
+  return { loadChats, saveChats, loadMessages, saveMessages, deleteChat, clearAllChats };
+})();
+
+
+/* ════════════════════════════════════════════════════════════════
+   Chat UI — main DOMContentLoaded handler
+════════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!document.getElementById('chatArea')) return;
+
+  /* ── Auth guard (fast — reads from localStorage cache) ──── */
+  let currentUserId = null;
+  if (typeof LexisAuth !== 'undefined') {
+    const user = await LexisAuth.getUser();
+    if (!user) { LexisAuth.redirectToLogin(); return; }
+    currentUserId = user.id;
   }
 
   /* ── Elements ─────────────────────────────────────────────── */
-  const chatArea    = document.getElementById('chatArea');
-  const messagesEl  = document.getElementById('messages');
-  const welcomeEl   = document.getElementById('welcomeScreen');
-  const chatInput   = document.getElementById('chatInput');
-  const sendBtn     = document.getElementById('sendBtn');
-  const sendIcon    = document.getElementById('sendIcon');
-  const voiceBtn    = document.getElementById('voiceBtn');
-  const attachBtn   = document.getElementById('attachBtn');
-  const shareBtn    = document.getElementById('shareBtn');
+  const chatArea   = document.getElementById('chatArea');
+  const messagesEl = document.getElementById('messages');
+  const welcomeEl  = document.getElementById('welcomeScreen');
+  const chatInput  = document.getElementById('chatInput');
+  const sendBtn    = document.getElementById('sendBtn');
+  const sendIcon   = document.getElementById('sendIcon');
+  const voiceBtn   = document.getElementById('voiceBtn');
+  const attachBtn  = document.getElementById('attachBtn');
+  const shareBtn   = document.getElementById('shareBtn');
 
-  /* Model selector */
   const modelSelector = document.getElementById('modelSelector');
   const modelDropdown = document.getElementById('modelDropdown');
   const modelNameEl   = document.getElementById('modelName');
 
-  /* ── State ────────────────────────────────────────────────── */
-  let isStreaming      = false;
-  let streamController = null;
-  let isRecording      = false;
+  /* ── State ───────────────────────────────────────────────── */
+  let isStreaming       = false;
+  let streamController  = null;
+  let isRecording       = false;
   let speechRecognition = null;
-  let currentChatId    = 'chat_' + Date.now();
+  let currentChatId     = null;          // null = no active chat yet
+  let conversationHistory = [];          // [{role:'user'|'assistant', content:'...'}]
+  let currentModel      = 'lexis-standard';
   let enterSendsMessage = true;
-  let currentModel     = 'eduvision-standard';
 
-  /* ── Settings sync ────────────────────────────────────────── */
+  /* ── Settings sync ───────────────────────────────────────── */
   document.getElementById('enterSendToggle')?.addEventListener('change', (e) => {
     enterSendsMessage = e.target.checked;
   });
 
-  /* ── Model selector ───────────────────────────────────────── */
+  /* ── Model selector ──────────────────────────────────────── */
   modelSelector?.addEventListener('click', (e) => {
     e.stopPropagation();
     const isOpen = modelDropdown.classList.contains('open');
@@ -78,7 +256,8 @@ document.addEventListener('DOMContentLoaded', () => {
     opt.addEventListener('click', (e) => {
       e.stopPropagation();
       const model = opt.dataset.model;
-      if ((model === 'eduvision-pro' || model === 'eduvision-research') && user?.plan !== 'pro') {
+      // Pro-only models check
+      if (model === 'eduvision-pro' || model === 'eduvision-research') {
         showToast('Upgrade to Pro to use this model');
         modelDropdown.classList.remove('open');
         modelSelector.classList.remove('open');
@@ -93,14 +272,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  /* ── Input resize ─────────────────────────────────────────── */
+  document.addEventListener('click', (e) => {
+    if (!modelSelector?.contains(e.target)) {
+      modelDropdown?.classList.remove('open');
+      modelSelector?.classList.remove('open');
+    }
+  });
+
+  /* ── Input auto-resize ───────────────────────────────────── */
   chatInput.addEventListener('input', () => {
     chatInput.style.height = 'auto';
     chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px';
     updateSendBtn();
   });
 
-  /* ── Send on Enter ────────────────────────────────────────── */
+  /* ── Send on Enter ───────────────────────────────────────── */
   chatInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       if (!enterSendsMessage) return;
@@ -135,141 +321,114 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Generation stopped');
   }
 
-  /* ── Handle send ──────────────────────────────────────────── */
   function handleSend() {
     const text = chatInput.value.trim();
-    if (!text) return;
+    if (!text || isStreaming) return;
     chatInput.value = '';
     chatInput.style.height = 'auto';
     updateSendBtn();
     sendMessage(text);
   }
 
-  /* ── Send message ─────────────────────────────────────────── */
-  function sendMessage(text) {
-    /* Hide welcome, ensure chat ID */
+  /* ── Send message + get AI response ─────────────────────── */
+  async function sendMessage(text) {
     welcomeEl.style.display = 'none';
 
-    /* Create chat entry in sidebar if this is first message */
-    if (messagesEl.children.length === 0) {
-      const autoTitle = text.length > 40 ? text.substring(0, 40) + '…' : text;
-      window.dispatchEvent(new CustomEvent('eduvision:chatCreated', {
-        detail: { chatId: currentChatId, title: autoTitle }
+    // Create a new chat in the sidebar if this is the first message
+    if (!currentChatId) {
+      currentChatId = 'chat_' + Date.now();
+      const autoTitle = text.length > 45 ? text.slice(0, 45) + '…' : text;
+
+      // Save to chat list
+      const chats = ChatStorage.loadChats(currentUserId);
+      chats.unshift({ id: currentChatId, title: autoTitle, group: 'Today', createdAt: Date.now() });
+      ChatStorage.saveChats(currentUserId, chats);
+
+      // Tell sidebar to add it
+      window.dispatchEvent(new CustomEvent('lexis:chatCreated', {
+        detail: { chatId: currentChatId, title: autoTitle },
       }));
     }
 
-    addMessage('user', text);
+    // Render user message
+    const userAvatar = window._lexisUserAvatar || 'https://i.pravatar.cc/100?u=default';
+    addMessage('user', text, false, userAvatar);
 
-    /* Show typing indicator */
+    // Add to conversation history for multi-turn context
+    conversationHistory.push({ role: 'user', content: text });
+
+    // Save messages to storage
+    ChatStorage.saveMessages(currentChatId, currentUserId, conversationHistory);
+
+    // Show typing indicator while waiting for AI
     const typingEl = addTypingIndicator();
-
     isStreaming = true;
     updateSendBtn();
-
-    /* ── TODO: Replace simulateStreaming() with real API:
-       streamController = new AbortController();
-       try {
-         const res = await fetch('/api/chat', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({
-             message: text,
-             model: currentModel,
-             chatId: currentChatId
-           }),
-           signal: streamController.signal
-         });
-         // For streaming SSE:
-         const reader = res.body.getReader();
-         const decoder = new TextDecoder();
-         let aiText = '';
-         typingEl.remove();
-         const msgEl = addMessage('ai', '', true);
-         const textEl = msgEl.querySelector('.message-text');
-         while (true) {
-           const { done, value } = await reader.read();
-           if (done) break;
-           const chunk = decoder.decode(value);
-           aiText += chunk;
-           textEl.innerHTML = formatMarkdown(aiText) + '<span class="cursor"></span>';
-           scrollToBottom();
-         }
-         textEl.innerHTML = formatMarkdown(aiText);
-         addMessageActions(msgEl, aiText);
-       } catch (err) {
-         if (err.name !== 'AbortError') showToast('Error: Could not reach AI server');
-       } finally {
-         isStreaming = false;
-         streamController = null;
-         updateSendBtn();
-       }
-    ─────────────────────────────────────────────────────────── */
-
     streamController = new AbortController();
-    const responseText = getAIResponse(text);
-    simulateStreaming(responseText, typingEl, streamController.signal)
-      .finally(() => {
-        isStreaming = false;
-        streamController = null;
-        updateSendBtn();
-        /* Auto-update chat title after first response */
-        const firstUserMsg = messagesEl.querySelector('.message.user .message-text');
-        if (firstUserMsg) {
-          const title = firstUserMsg.textContent.length > 40
-            ? firstUserMsg.textContent.substring(0, 40) + '…'
-            : firstUserMsg.textContent;
-          window.dispatchEvent(new CustomEvent('eduvision:chatTitleUpdate', {
-            detail: { chatId: currentChatId, title }
-          }));
-        }
-      });
-  }
 
-  /* ── Simulate streaming word-by-word ─────────────────────── */
-  async function simulateStreaming(text, typingEl, signal) {
-    typingEl.remove();
-    const msgEl  = addMessage('ai', '', true);
-    const textEl = msgEl.querySelector('.message-text');
-    const words  = text.split(' ');
-    let displayed = '';
+    try {
+      const aiText = await callAI(conversationHistory, streamController.signal);
 
-    for (let i = 0; i < words.length; i++) {
-      if (signal.aborted) break;
-      await sleep(24 + Math.random() * 16);
-      displayed += (i === 0 ? '' : ' ') + words[i];
-      textEl.innerHTML = formatMarkdown(displayed) + '<span class="cursor"></span>';
-      scrollToBottom();
+      typingEl.remove();
+      const msgEl = addMessage('ai', aiText);
+      addMessageActions(msgEl, aiText);
+
+      // Add to conversation history
+      conversationHistory.push({ role: 'assistant', content: aiText });
+      ChatStorage.saveMessages(currentChatId, currentUserId, conversationHistory);
+
+      // Update chat title after first exchange if still default
+      if (conversationHistory.length === 2) {
+        window.dispatchEvent(new CustomEvent('lexis:chatTitleUpdate', {
+          detail: { chatId: currentChatId, title: text.slice(0, 45) + (text.length > 45 ? '…' : '') },
+        }));
+      }
+
+    } catch (err) {
+      typingEl.remove();
+      if (err.name !== 'AbortError') {
+        addMessage('ai', `**Error:** ${err.message}\n\nPlease check your API key in \`js/chat.js\` and try again.`);
+        showToast('Could not reach AI — check API key', 'error');
+      }
+    } finally {
+      isStreaming = false;
+      streamController = null;
+      updateSendBtn();
     }
-    textEl.innerHTML = formatMarkdown(displayed);
-    addMessageActions(msgEl, displayed);
   }
 
-  /* ── Quick prompts ────────────────────────────────────────── */
+  /* ── Quick prompts on welcome screen ─────────────────────── */
   document.querySelectorAll('.prompt-card').forEach(card => {
-    card.addEventListener('click', () => sendMessage(card.dataset.prompt));
+    card.addEventListener('click', () => {
+      if (card.dataset.prompt) sendMessage(card.dataset.prompt);
+    });
   });
 
-  /* ── Load existing chat ───────────────────────────────────── */
-  window.addEventListener('eduvision:loadChat', (e) => {
-    const { chatId, title } = e.detail;
+  /* ── Load an existing chat from storage ──────────────────── */
+  window.addEventListener('lexis:loadChat', (e) => {
+    const { chatId } = e.detail;
     currentChatId = chatId;
+    conversationHistory = ChatStorage.loadMessages(chatId, currentUserId);
+
     messagesEl.innerHTML = '';
     welcomeEl.style.display = 'none';
-    /* Simulate loading a previous conversation */
-    setTimeout(() => {
-      addMessage('user', title);
-      const typingEl = addTypingIndicator();
-      isStreaming = true;
-      updateSendBtn();
-      streamController = new AbortController();
-      simulateStreaming(getAIResponse(title), typingEl, streamController.signal)
-        .finally(() => { isStreaming = false; streamController = null; updateSendBtn(); });
-    }, 120);
+
+    if (conversationHistory.length === 0) {
+      welcomeEl.style.display = 'flex';
+      return;
+    }
+
+    const userAvatar = window._lexisUserAvatar || 'https://i.pravatar.cc/100?u=default';
+    conversationHistory.forEach(msg => {
+      const el = addMessage(msg.role === 'user' ? 'user' : 'ai', msg.content, false, userAvatar);
+      if (msg.role === 'assistant') addMessageActions(el, msg.content);
+    });
   });
 
-  /* ── New chat event ───────────────────────────────────────── */
-  window.addEventListener('eduvision:newChat', () => {
-    currentChatId = 'chat_' + Date.now();
+  /* ── New chat ────────────────────────────────────────────── */
+  window.addEventListener('lexis:newChat', () => {
+    currentChatId = null;
+    conversationHistory = [];
     messagesEl.innerHTML = '';
     welcomeEl.style.display = 'flex';
     chatInput.value = '';
@@ -279,28 +438,27 @@ document.addEventListener('DOMContentLoaded', () => {
     isStreaming = false;
   });
 
-  /* ── Build message elements ───────────────────────────────── */
-  function addMessage(role, text, streaming = false) {
-    const isAI = role === 'ai';
-    const div = document.createElement('div');
-    div.className = `message ${role}`;
+  // Also handle legacy event names from any un-updated code
+  window.addEventListener('eduvision:loadChat',    (e) => window.dispatchEvent(new CustomEvent('lexis:loadChat',    { detail: e.detail })));
+  window.addEventListener('eduvision:newChat',     ()  => window.dispatchEvent(new CustomEvent('lexis:newChat')));
+  window.addEventListener('eduvision:chatCreated', (e) => window.dispatchEvent(new CustomEvent('lexis:chatCreated', { detail: e.detail })));
 
-    const avatarSrc = isAI ? '' : (user?.avatar || `https://i.pravatar.cc/100?u=default`);
+  /* ── Build message elements ──────────────────────────────── */
+  function addMessage(role, text, _streaming = false, avatarSrc) {
+    const isAI = role === 'ai';
+    const div  = document.createElement('div');
+    div.className = `message ${role}`;
 
     div.innerHTML = `
       <div class="message-avatar">
         ${isAI
           ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`
-          : `<img src="${avatarSrc}" alt="You" />`
+          : `<img src="${escapeAttr(avatarSrc || 'https://i.pravatar.cc/100?u=default')}" alt="You" />`
         }
       </div>
       <div class="message-content">
-        ${isAI ? '<p class="message-author">EduVision AI</p>' : ''}
-        <div class="message-text">${
-          isAI
-            ? (streaming ? '' : formatMarkdown(text))
-            : escapeHTML(text)
-        }</div>
+        ${isAI ? '<p class="message-author">Lexis AI</p>' : ''}
+        <div class="message-text">${isAI ? formatMarkdown(text) : escapeHTML(text)}</div>
       </div>
     `;
     messagesEl.appendChild(div);
@@ -316,7 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
       </div>
       <div class="message-content">
-        <p class="message-author">EduVision AI</p>
+        <p class="message-author">Lexis AI</p>
         <div class="typing-indicator">
           <div class="typing-dot"></div>
           <div class="typing-dot"></div>
@@ -343,23 +501,21 @@ document.addEventListener('DOMContentLoaded', () => {
       <button class="msg-action-btn dislike-btn" title="Bad response" data-state="0">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
       </button>
-      <button class="msg-action-btn regenerate-btn" title="Regenerate response">
+      <button class="msg-action-btn regenerate-btn" title="Regenerate">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.29"/></svg>
       </button>
     `;
     msgEl.querySelector('.message-content').appendChild(actionsEl);
 
-    /* Copy */
     actionsEl.querySelector('.copy-btn').addEventListener('click', (e) => {
       navigator.clipboard.writeText(text).then(() => {
         const btn = e.currentTarget;
-        const original = btn.innerHTML;
+        const orig = btn.innerHTML;
         btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
-        setTimeout(() => { btn.innerHTML = original; }, 2000);
+        setTimeout(() => { btn.innerHTML = orig; }, 2000);
       });
     });
 
-    /* Like */
     actionsEl.querySelector('.like-btn').addEventListener('click', (e) => {
       const btn = e.currentTarget;
       const active = btn.dataset.state === '1';
@@ -370,7 +526,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!active) showToast('Thanks for the feedback!', 'success');
     });
 
-    /* Dislike */
     actionsEl.querySelector('.dislike-btn').addEventListener('click', (e) => {
       const btn = e.currentTarget;
       const active = btn.dataset.state === '1';
@@ -378,107 +533,81 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.style.color = active ? '' : 'var(--danger)';
       actionsEl.querySelector('.like-btn').dataset.state = '0';
       actionsEl.querySelector('.like-btn').style.color = '';
-      if (!active) showToast('Feedback noted. We\'ll improve!');
+      if (!active) showToast("Feedback noted. We'll improve!");
     });
 
-    /* Regenerate */
-    actionsEl.querySelector('.regenerate-btn').addEventListener('click', () => {
+    actionsEl.querySelector('.regenerate-btn').addEventListener('click', async () => {
       if (isStreaming) return;
-      /* Find the last user message and re-send */
-      const userMsgs = messagesEl.querySelectorAll('.message.user .message-text');
-      const lastUserMsg = userMsgs[userMsgs.length - 1];
-      if (!lastUserMsg) return;
-      /* Remove this AI message and re-stream */
+      // Remove last assistant message from history and re-send
+      if (conversationHistory[conversationHistory.length - 1]?.role === 'assistant') {
+        conversationHistory.pop();
+      }
       msgEl.remove();
+
+      const lastUserMsg = conversationHistory[conversationHistory.length - 1];
+      if (!lastUserMsg) return;
+
       const typingEl = addTypingIndicator();
       isStreaming = true;
       updateSendBtn();
       streamController = new AbortController();
-      simulateStreaming(getAIResponse(lastUserMsg.textContent), typingEl, streamController.signal)
-        .finally(() => { isStreaming = false; streamController = null; updateSendBtn(); });
+
+      try {
+        const aiText = await callAI(conversationHistory, streamController.signal);
+        typingEl.remove();
+        const newMsgEl = addMessage('ai', aiText);
+        addMessageActions(newMsgEl, aiText);
+        conversationHistory.push({ role: 'assistant', content: aiText });
+        ChatStorage.saveMessages(currentChatId, currentUserId, conversationHistory);
+      } catch (err) {
+        typingEl.remove();
+        if (err.name !== 'AbortError') showToast('Regeneration failed', 'error');
+      } finally {
+        isStreaming = false;
+        streamController = null;
+        updateSendBtn();
+      }
     });
   }
 
-  /* ── Attach file (placeholder) ────────────────────────────── */
-  attachBtn?.addEventListener('click', () => {
-    /* TODO: implement file upload */
-    showToast('File upload coming soon!');
-  });
-
-  /* ── Share button ─────────────────────────────────────────── */
-  shareBtn?.addEventListener('click', () => {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      showToast('Chat link copied to clipboard!', 'success');
-    }).catch(() => {
-      showToast('Could not copy link');
-    });
-  });
-
-  /* ── Voice Input (Web Speech API) ─────────────────────────── */
-  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if (SpeechRecognitionAPI) {
-    speechRecognition = new SpeechRecognitionAPI();
+  /* ── Voice input ─────────────────────────────────────────── */
+  const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechAPI) {
+    speechRecognition = new SpeechAPI();
     speechRecognition.lang = 'en-US';
     speechRecognition.continuous = false;
     speechRecognition.interimResults = true;
 
     speechRecognition.onresult = (e) => {
-      const transcript = Array.from(e.results)
-        .map(r => r[0].transcript).join('');
-      chatInput.value = transcript;
+      chatInput.value = Array.from(e.results).map(r => r[0].transcript).join('');
       chatInput.style.height = 'auto';
       chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px';
       updateSendBtn();
     };
-
-    speechRecognition.onend = () => {
-      isRecording = false;
-      voiceBtn.classList.remove('recording');
-      voiceBtn.title = 'Voice input';
-    };
-
+    speechRecognition.onend  = () => { isRecording = false; voiceBtn?.classList.remove('recording'); };
     speechRecognition.onerror = (e) => {
       isRecording = false;
-      voiceBtn.classList.remove('recording');
+      voiceBtn?.classList.remove('recording');
       if (e.error === 'not-allowed') showToast('Microphone permission denied');
       else showToast('Voice recognition error: ' + e.error);
     };
 
     voiceBtn?.addEventListener('click', () => {
-      if (isRecording) {
-        speechRecognition.stop();
-        isRecording = false;
-        voiceBtn.classList.remove('recording');
-        voiceBtn.title = 'Voice input';
-      } else {
-        speechRecognition.start();
-        isRecording = true;
-        voiceBtn.classList.add('recording');
-        voiceBtn.title = 'Stop recording';
-        showToast('Listening… speak now');
-      }
+      if (isRecording) { speechRecognition.stop(); }
+      else { speechRecognition.start(); isRecording = true; voiceBtn.classList.add('recording'); showToast('Listening… speak now'); }
     });
   } else {
-    voiceBtn?.addEventListener('click', () => {
-      showToast('Voice input not supported in this browser');
-    });
+    voiceBtn?.addEventListener('click', () => showToast('Voice input not supported in this browser'));
   }
 
-  /* ── Close dropdowns on outside click ────────────────────── */
-  document.addEventListener('click', (e) => {
-    if (!modelSelector?.contains(e.target)) {
-      modelDropdown?.classList.remove('open');
-      modelSelector?.classList.remove('open');
-    }
+  /* ── Attach / Share ──────────────────────────────────────── */
+  attachBtn?.addEventListener('click', () => showToast('File upload coming soon!'));
+  shareBtn?.addEventListener('click', () => {
+    navigator.clipboard.writeText(window.location.href).then(() => showToast('Chat link copied!', 'success'));
   });
 
-  /* ── Helpers ──────────────────────────────────────────────── */
-  function scrollToBottom() {
-    chatArea.scrollTop = chatArea.scrollHeight;
-  }
-
-  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+  /* ── Helpers ─────────────────────────────────────────────── */
+  function scrollToBottom() { chatArea.scrollTop = chatArea.scrollHeight; }
 
   function formatMarkdown(text) {
     return text
@@ -493,129 +622,18 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/\n/g,'<br>');
   }
 
-  function escapeHTML(t) {
-    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
+  function escapeHTML(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escapeAttr(t) { return t.replace(/"/g,'&quot;'); }
 
-  /* ── AI Response database ─────────────────────────────────── */
-  const AI_RESPONSES = {
-    gpa: `**NEB GPA Calculation System**
-
-Nepal's National Examination Board uses a **4.0 GPA scale**:
-
-- **A+** — 90–100 marks → 4.0 GPA
-- **A** — 80–89 marks → 3.6 GPA
-- **B+** — 70–79 marks → 3.2 GPA
-- **B** — 60–69 marks → 2.8 GPA
-- **C+** — 50–59 marks → 2.4 GPA
-- **C** — 40–49 marks → 2.0 GPA
-
-**Formula:** GPA = Σ (Grade Point × Credit Hours) ÷ Total Credit Hours
-
-To pass, you need at least **35 marks** in each subject.
-
-Would you like me to calculate your GPA based on your subject marks?`,
-
-    physics: `**Grade 12 Physics — Rotational Dynamics**
-*Nepal CDC Curriculum*
-
-**Moment of Inertia (I)**
-The rotational equivalent of mass. Formula: \`I = Σmr²\`
-
-**Torque (τ)**
-Rotational force. Formula: \`τ = r × F = Iα\`
-
-**Angular Momentum (L)**
-Formula: \`L = Iω\`
-Conservation law: If net torque = 0, then L is constant.
-
-**NEB Exam Tips:**
-- Numerical problems on torque carry 5–10 marks
-- Practice rolling motion problems thoroughly
-- Understand the parallel axis theorem
-
-Want notes on another chapter?`,
-
-    scholarship: `**Scholarships for Nepalese Students 2024**
-
-**Government Scholarships:**
-- **Ministry of Education** — For SEE toppers
-- **President Educational Fund** — Merit-based, all levels
-- **TU/IOE Entrance Scholarship** — Top 50 rankers: 100% fee waiver
-
-**International Scholarships:**
-- **Fulbright Program** — USA (postgraduate)
-- **Chevening** — UK (master's programs)
-- **MEXT** — Japan (undergrad & graduate)
-- **Chinese Government Scholarship** — Full funding
-
-**Application Tips:**
-- Keep your SEE and +2 certificates ready
-- Apply early — deadlines are strict
-- Get a character certificate from your school
-
-Want details on applying for any of these?`,
-
-    study: `**30-Day NEB Exam Preparation Plan**
-
-**Week 1 — Foundation Review**
-- Day 1–3: Mathematics (Calculus & Algebra)
-- Day 4–5: Physics (Mechanics & Waves)
-- Day 6–7: Chemistry (Organic fundamentals)
-
-**Week 2 — Core Chapters**
-- Day 8–10: Physics (Electricity & Optics)
-- Day 11–12: Chemistry (Inorganic)
-- Day 13–14: Biology or optional subject
-
-**Week 3 — Practice**
-- Daily: 2 past paper questions per subject
-- Focus on weakest topics from Week 1–2
-- Practice 3-hour timed sessions
-
-**Week 4 — Final Revision**
-- Day 22–25: Formula sheets & quick notes
-- Day 26–28: Full mock exams
-- Day 29–30: Light review only, rest well
-
-**Pro Tip:** 6–8 focused hours beats 12-hour exhausted sessions every time.`,
-
-    default: `Hello! I'm **EduVision AI**, your personal study assistant for Nepal's education system.
-
-I can help you with:
-
-- **CDC Curriculum** — Notes and explanations for all subjects
-- **NEB Exam Prep** — Past papers, topic-wise revision, and strategies
-- **GPA Calculator** — Understand and calculate your NEB GPA
-- **Scholarship Finder** — Verified opportunities for Nepali students
-- **Career Guidance** — Engineering, Medicine, Management & more
-
-What would you like to learn today?`,
-  };
-
-  function getAIResponse(message) {
-    const lower = message.toLowerCase();
-    if (lower.includes('gpa') || lower.includes('grade') || lower.includes('marks') || lower.includes('score'))
-      return AI_RESPONSES.gpa;
-    if (lower.includes('physics') || lower.includes('newton') || lower.includes('chapter') || lower.includes('note'))
-      return AI_RESPONSES.physics;
-    if (lower.includes('scholarship') || lower.includes('fund') || lower.includes('opportunity') || lower.includes('abroad'))
-      return AI_RESPONSES.scholarship;
-    if (lower.includes('study plan') || lower.includes('preparation') || lower.includes('prepare') || lower.includes('schedule'))
-      return AI_RESPONSES.study;
-    return AI_RESPONSES.default;
-  }
-
-  /* ── Toast helper (also used by other modules) ────────────── */
-  window.showToast = function(msg, type = '') {
+  /* ── Global toast (used by modals.js too) ────────────────── */
+  window.showToast = function(msg, type) {
     const t = document.getElementById('toast');
     if (!t) return;
     t.textContent = msg;
-    t.className = 'toast ' + type + ' show';
+    t.className   = 'toast ' + (type || '') + ' show';
     clearTimeout(t._timer);
     t._timer = setTimeout(() => { t.className = 'toast'; }, 3200);
   };
 
-  /* Initial send button state */
   updateSendBtn();
 });
