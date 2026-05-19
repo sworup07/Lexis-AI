@@ -30,8 +30,8 @@
 const API_CONFIG = {
   provider: 'openrouter',
   endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-  apiKey:   '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',
-  model:    'poolside/laguna-m.1:free',   // ← updated to available free model
+  apiKey:   'API KEY',
+  model:    'MODEL',   // ← updated to available free model
 };
 
 /* System prompt — defines how Lexis AI behaves */
