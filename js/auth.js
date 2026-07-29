@@ -148,6 +148,27 @@ const LexisAuth = (() => {
     return data;
   }
 
+  /* ── Upgrade a guest to a permanent Google account ─────────
+     Uses linkIdentity(), not signInWithOAuth() — this keeps the
+     SAME user id, so the guest's existing chats (tied to that id)
+     carry over instead of being orphaned under a throwaway
+     anonymous account. Requires "Manual Linking" to be enabled in
+     Supabase Dashboard → Authentication (separate from the
+     anonymous sign-in toggle). Throws if that's not enabled, or if
+     the current session isn't actually anonymous — callers should
+     fall back to signInWithGoogle() in that case.
+  ─────────────────────────────────────────────────────────────── */
+  async function upgradeGuestToGoogle() {
+    const sb = getSB();
+    if (!sb) throw new Error('Supabase not initialised.');
+    const { error } = await sb.auth.linkIdentity({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + '/chat.html' },
+    });
+    if (error) throw error;
+    // Browser redirects to Google — no return value needed
+  }
+
   /* ── Google Sign-In via Supabase OAuth ───────────────────── */
   async function signInWithGoogle() {
     const sb = getSB();
@@ -289,7 +310,8 @@ const LexisAuth = (() => {
 
   return {
     getUser, getUserProfile, isLoggedIn, getAccessToken, getClient,
-    signInWithGoogle, continueAsGuest, signUpWithEmail, signInWithEmail,
+    signInWithGoogle, continueAsGuest, upgradeGuestToGoogle,
+    signUpWithEmail, signInWithEmail,
     sendPasswordReset, signOut, upsertProfile,
     populateChatUI, onAuthStateChange,
     redirectToChat, redirectToLogin,

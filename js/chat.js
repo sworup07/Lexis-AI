@@ -166,9 +166,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   guestPopupSignIn?.addEventListener('click', async () => {
     try {
-      if (typeof LexisAuth !== 'undefined') await LexisAuth.signInWithGoogle();
+      if (typeof LexisAuth !== 'undefined') await LexisAuth.upgradeGuestToGoogle();
     } catch (err) {
-      showToast?.(err.message || 'Sign-in failed. Try again.', 'error');
+      console.warn('upgradeGuestToGoogle failed, falling back to a fresh sign-in:', err.message);
+      try {
+        showToast?.('Signing in — this guest chat history won\'t carry over.', 'error');
+        if (typeof LexisAuth !== 'undefined') await LexisAuth.signInWithGoogle();
+      } catch (err2) {
+        showToast?.(err2.message || 'Sign-in failed. Try again.', 'error');
+      }
     }
   });
 
