@@ -27,21 +27,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const user = await LexisAuth.getUser();
     currentUserId = user?.id || null;
   }
+  const sb = (typeof LexisAuth !== 'undefined') ? LexisAuth.getClient() : null;
 
-  function storageKey() { return `lexis_chats_${currentUserId || 'guest'}`; }
-
-  /* ── Load real chats (no fake seed data) ───────────────────── */
+  /* ── Load real chats from Supabase (no fake seed data) ─────── */
   let chatList = [];
-  try {
-    chatList = JSON.parse(localStorage.getItem(storageKey()) || '[]');
-  } catch { chatList = []; }
+  async function fetchChatList() {
+    if (!sb || !currentUserId) return [];
+    const { data, error } = await sb
+      .from('chats')
+      .select('id, title, created_at')
+      .eq('user_id', currentUserId)
+      .order('created_at', { ascending: false });
+    if (error) { console.warn('fetchChatList error:', error.message); return []; }
+    return data.map(row => ({ id: row.id, title: row.title, createdAt: new Date(row.created_at).getTime() }));
+  }
+  chatList = await fetchChatList();
 
   let activeChatId  = null;
   let contextTarget = null;
-
-  function saveChatList() {
-    localStorage.setItem(storageKey(), JSON.stringify(chatList));
-  }
 
   /* ── Sidebar open / close ──────────────────────────────────── */
   function openSidebar() {
@@ -163,7 +166,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Avoid duplicates
     if (!chatList.find(c => c.id === newChat.id)) {
       chatList.unshift(newChat);
-      saveChatList();
+      if (sb && currentUserId) {
+        sb.from('chats').insert({
+          id:         newChat.id,
+          user_id:    currentUserId,
+          title:      newChat.title,
+          created_at: new Date(newChat.createdAt).toISOString(),
+        }).then(({ error }) => { if (error) console.warn('addNewChat insert error:', error.message); });
+      }
     }
     activeChatId = newChat.id;
     renderChatList();
@@ -176,11 +186,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       entryEl.style.opacity    = '0';
       entryEl.style.transform  = 'translateX(-8px)';
     }
-    setTimeout(() => {
-      // Remove messages from storage too
-      localStorage.removeItem('lexis_msgs_' + (currentUserId || 'guest') + '_' + chatId);
+    setTimeout(async () => {
+      // Deleting the chat row cascades to chat_messages automatically
+      // (see "on delete cascade" in the SQL migration) — no separate
+      // messages delete needed.
+      if (sb && currentUserId) {
+        const { error } = await sb.from('chats').delete().eq('id', chatId).eq('user_id', currentUserId);
+        if (error) console.warn('deleteChat error:', error.message);
+      }
       chatList = chatList.filter(c => c.id !== chatId);
-      saveChatList();
       if (activeChatId === chatId) {
         activeChatId = null;
         window.dispatchEvent(new CustomEvent('lexis:newChat'));
@@ -203,9 +217,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (delBtn) delBtn.style.display = 'none';
     input.focus(); input.select();
 
-    function finish() {
+    async function finish() {
       chat.title = input.value.trim() || chat.title;
-      saveChatList();
+      if (sb && currentUserId) {
+        const { error } = await sb.from('chats').update({ title: chat.title }).eq('id', chatId).eq('user_id', currentUserId);
+        if (error) console.warn('renameChat error:', error.message);
+      }
       renderChatList();
     }
     input.addEventListener('keydown', (e) => {
@@ -260,11 +277,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('lexis:chatTitleUpdate', (e) => {
     const { chatId, title } = e.detail;
     const chat = chatList.find(c => c.id === chatId);
-    if (chat) { chat.title = title; saveChatList(); renderChatList(); }
+    if (chat) {
+      chat.title = title;
+      if (sb && currentUserId) {
+        sb.from('chats').update({ title }).eq('id', chatId).eq('user_id', currentUserId)
+          .then(({ error }) => { if (error) console.warn('chatTitleUpdate error:', error.message); });
+      }
+      renderChatList();
+    }
   });
 
+  async function clearAllChats() {
+    if (sb && currentUserId) {
+      const { error } = await sb.from('chats').delete().eq('user_id', currentUserId);
+      if (error) console.warn('clearAllChats error:', error.message);
+    }
+    chatList = [];
+    activeChatId = null;
+    renderChatList();
+  }
+
   /* ── Expose globally ──────────────────────────────────────── */
-  window.LexisSidebar    = { addNewChat, deleteChat, startRename, loadChat, renderChatList, getActiveChatId: () => activeChatId };
+  window.LexisSidebar    = { addNewChat, deleteChat, startRename, loadChat, renderChatList, clearAllChats, getActiveChatId: () => activeChatId };
   window.EduVisionSidebar = window.LexisSidebar;
 
   renderChatList();

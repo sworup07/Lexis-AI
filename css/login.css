@@ -214,6 +214,29 @@ body { height: 100dvh; overflow: hidden; }
 .btn-google:hover { background: #f8f8f8; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
 [data-theme="light"] .btn-google { background: #fff; }
 
+/* Guest access button */
+.btn-guest {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  height: 48px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-size: 14.5px;
+  font-weight: 600;
+  transition: background var(--t), border-color var(--t);
+  position: relative;
+}
+.btn-guest:hover { background: var(--surface-3); border-color: var(--border-hover); }
+
+.guest-note {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 8px;
+}
+
 /* Divider */
 .login-divider {
   display: flex; align-items: center; gap: 12px;

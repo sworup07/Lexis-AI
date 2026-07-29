@@ -132,7 +132,7 @@
 
       <div class="login-form-header">
         <h2>Welcome to Lexis AI</h2>
-        <p>Sign in or create an account to start learning</p>
+        <p>Sign in with Google to start learning</p>
       </div>
             <button class="btn-google" id="googleSignInBtn" aria-label="Continue with Google">
         <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
@@ -148,38 +148,12 @@
       <!-- Divider -->
       <div class="login-divider" role="separator"><span>or</span></div>
 
-      <!-- Email form -->
-      <form class="login-email-form" id="loginEmailForm" novalidate aria-label="Email sign in form">
-        <div class="form-group">
-          <label for="emailInput">Email address</label>
-          <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" aria-required="true" />
-          <span class="form-error" id="emailError" role="alert" aria-live="polite"></span>
-        </div>
-        <div class="form-group">
-          <label for="passwordInput">Password</label>
-          <div class="password-wrap">
-            <input type="password" id="passwordInput" placeholder="Enter your password" autocomplete="current-password" aria-required="true" />
-            <button type="button" class="password-toggle" id="passwordToggle" title="Show/hide password" aria-label="Toggle password visibility">
-              <svg id="eyeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg id="eyeOffIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            </button>
-          </div>
-          <span class="form-error" id="passwordError" role="alert" aria-live="polite"></span>
-        </div>
-        <div class="form-forgot">
-          <a href="#" id="forgotPasswordLink">Forgot password?</a>
-        </div>
-        <button type="submit" class="btn-email-signin" id="emailSignInBtn">
-          <span id="emailBtnText">Sign In</span>
-          <div class="btn-spinner" id="emailSpinner" style="display:none" role="status" aria-label="Signing in…"></div>
-        </button>
-      </form>
-
-      <!-- Switch Sign In / Sign Up -->
-      <div class="login-switch">
-        <span id="switchText">Don't have an account?</span>
-        <button id="switchModeBtn" class="link-btn">Sign up</button>
-      </div>
+      <!-- Guest access — no account needed, limited questions/day -->
+      <button class="btn-guest" id="guestContinueBtn" type="button">
+        <span id="guestBtnText">Try without an account</span>
+        <div class="btn-spinner" id="guestSpinner" style="display:none" aria-hidden="true" role="status"></div>
+      </button>
+      <p class="guest-note">5 free questions per day, no sign-up needed</p>
 
       <!-- Terms -->
       <p class="login-terms">

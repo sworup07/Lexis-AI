@@ -144,12 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
     showConfirm(
       'Clear All Chat History?',
       'This will permanently delete all your chat conversations. This action cannot be undone.',
-      () => {
-        localStorage.removeItem('lexis_chats');
+      async () => {
         if (window.LexisSidebar) {
+          await window.LexisSidebar.clearAllChats();
           window.dispatchEvent(new CustomEvent('lexis:newChat'));
-          const hist = $('chatHistory');
-          if (hist) hist.innerHTML = '<p style="text-align:center;color:var(--text-faint);font-size:13px;padding:24px 8px;">No chats yet. Start a new conversation!</p>';
         }
         closeModal('settingsModal');
         showToast('All chat history cleared', 'success');

@@ -62,8 +62,10 @@ async function callAI(conversationHistory, signal) {
     let errMsg = 'Something went wrong (error ' + res.status + ').';
     try { const j = await res.json(); errMsg = j?.error || errMsg; } catch (_) {}
     if (res.status === 401) errMsg = 'Your session has expired. Please sign in again.';
-    if (res.status === 429) errMsg = 'Rate limit hit. Wait a moment and try again.';
     if (res.status === 503) errMsg = 'Model temporarily unavailable. Try again shortly.';
+    // Note: 429 is left as-is — the edge function already returns a specific
+    // "hourly limit of N messages" message, which is more useful than a
+    // generic one here.
     throw new Error(errMsg);
   }
 
@@ -73,48 +75,63 @@ async function callAI(conversationHistory, signal) {
 
 
 /* ════════════════════════════════════════════════════════════════
-   Chat Storage — per-user chat history in localStorage
+   Chat Storage — per-user chat history in Supabase (chat_messages
+   table). Falls back to doing nothing gracefully if not signed in
+   or the client isn't ready, so the UI never throws.
 ════════════════════════════════════════════════════════════════ */
 const ChatStorage = (() => {
-  function getStorageKey(userId) {
-    return `lexis_chats_${userId || 'guest'}`;
+  function getClient() {
+    return (typeof LexisAuth !== 'undefined') ? LexisAuth.getClient() : null;
   }
 
-  function loadChats(userId) {
-    try {
-      return JSON.parse(localStorage.getItem(getStorageKey(userId)) || '[]');
-    } catch { return []; }
+  async function loadMessages(chatId, userId) {
+    const sb = getClient();
+    if (!sb || !userId || !chatId) return [];
+    const { data, error } = await sb
+      .from('chat_messages')
+      .select('role, content')
+      .eq('chat_id', chatId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+    if (error) { console.warn('loadMessages error:', error.message); return []; }
+    return data.map(row => ({ role: row.role, content: row.content }));
   }
 
-  function saveChats(userId, chats) {
-    localStorage.setItem(getStorageKey(userId), JSON.stringify(chats));
+  // Appends only the newest message (the one not yet saved) instead of
+  // rewriting the whole conversation — cheaper and avoids duplicate rows.
+  async function appendMessage(chatId, userId, message) {
+    const sb = getClient();
+    if (!sb || !userId || !chatId) return;
+    const { error } = await sb.from('chat_messages').insert({
+      chat_id: chatId,
+      user_id: userId,
+      role:    message.role === 'assistant' ? 'assistant' : 'user',
+      content: message.content,
+    });
+    if (error) console.warn('appendMessage error:', error.message);
   }
 
-  function loadMessages(chatId, userId) {
-    try {
-      return JSON.parse(localStorage.getItem(`lexis_msgs_${userId}_${chatId}`) || '[]');
-    } catch { return []; }
+  // Used by "regenerate": removes the most recent assistant reply for
+  // this chat so we don't end up with duplicate rows in the table.
+  async function deleteLastAssistantMessage(chatId, userId) {
+    const sb = getClient();
+    if (!sb || !userId || !chatId) return;
+    const { data, error } = await sb
+      .from('chat_messages')
+      .select('id')
+      .eq('chat_id', chatId)
+      .eq('user_id', userId)
+      .eq('role', 'assistant')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) { console.warn('deleteLastAssistantMessage select error:', error.message); return; }
+    if (data?.[0]?.id) {
+      const { error: delErr } = await sb.from('chat_messages').delete().eq('id', data[0].id);
+      if (delErr) console.warn('deleteLastAssistantMessage delete error:', delErr.message);
+    }
   }
 
-  function saveMessages(chatId, userId, messages) {
-    localStorage.setItem(`lexis_msgs_${userId}_${chatId}`, JSON.stringify(messages));
-  }
-
-  function deleteChat(chatId, userId) {
-    // Remove messages
-    localStorage.removeItem(`lexis_msgs_${userId}_${chatId}`);
-    // Remove from chat list
-    const chats = loadChats(userId).filter(c => c.id !== chatId);
-    saveChats(userId, chats);
-  }
-
-  function clearAllChats(userId) {
-    const chats = loadChats(userId);
-    chats.forEach(c => localStorage.removeItem(`lexis_msgs_${userId}_${c.id}`));
-    saveChats(userId, []);
-  }
-
-  return { loadChats, saveChats, loadMessages, saveMessages, deleteChat, clearAllChats };
+  return { loadMessages, appendMessage, deleteLastAssistantMessage };
 })();
 
 
@@ -126,11 +143,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   /* ── Auth guard (fast — reads from localStorage cache) ──── */
   let currentUserId = null;
+  let isGuestUser    = false;
   if (typeof LexisAuth !== 'undefined') {
     const user = await LexisAuth.getUser();
     if (!user) { LexisAuth.redirectToLogin(); return; }
     currentUserId = user.id;
+    isGuestUser   = !!user.is_anonymous;
   }
+
+  /* ── Guest login-encouragement popup ─────────────────────── */
+  const guestPopup      = document.getElementById('guestPopup');
+  const guestPopupClose = document.getElementById('guestPopupClose');
+  const guestPopupSignIn = document.getElementById('guestPopupSignIn');
+  const GUEST_POPUP_DISMISSED_KEY = 'lexis_guest_popup_dismissed';
+
+  if (isGuestUser && guestPopup && localStorage.getItem(GUEST_POPUP_DISMISSED_KEY) !== 'true') {
+    setTimeout(() => guestPopup.classList.add('show'), 3000);
+  }
+  guestPopupClose?.addEventListener('click', () => {
+    guestPopup?.classList.remove('show');
+    localStorage.setItem(GUEST_POPUP_DISMISSED_KEY, 'true');
+  });
+  guestPopupSignIn?.addEventListener('click', async () => {
+    try {
+      if (typeof LexisAuth !== 'undefined') await LexisAuth.signInWithGoogle();
+    } catch (err) {
+      showToast?.(err.message || 'Sign-in failed. Try again.', 'error');
+    }
+  });
 
   /* ── Elements ─────────────────────────────────────────────── */
   const chatArea   = document.getElementById('chatArea');
@@ -257,12 +297,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentChatId = 'chat_' + Date.now();
       const autoTitle = text.length > 45 ? text.slice(0, 45) + '…' : text;
 
-      // Save to chat list
-      const chats = ChatStorage.loadChats(currentUserId);
-      chats.unshift({ id: currentChatId, title: autoTitle, group: 'Today', createdAt: Date.now() });
-      ChatStorage.saveChats(currentUserId, chats);
-
-      // Tell sidebar to add it
+      // Tell sidebar to add it (sidebar.js inserts the row into
+      // the `chats` table itself when it receives this event)
       window.dispatchEvent(new CustomEvent('lexis:chatCreated', {
         detail: { chatId: currentChatId, title: autoTitle },
       }));
@@ -276,7 +312,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     conversationHistory.push({ role: 'user', content: text });
 
     // Save messages to storage
-    ChatStorage.saveMessages(currentChatId, currentUserId, conversationHistory);
+    ChatStorage.appendMessage(currentChatId, currentUserId, { role: 'user', content: text });
 
     // Show typing indicator while waiting for AI
     const typingEl = addTypingIndicator();
@@ -293,7 +329,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Add to conversation history
       conversationHistory.push({ role: 'assistant', content: aiText });
-      ChatStorage.saveMessages(currentChatId, currentUserId, conversationHistory);
+      ChatStorage.appendMessage(currentChatId, currentUserId, { role: 'assistant', content: aiText });
 
       // Update chat title after first exchange if still default
       if (conversationHistory.length === 2) {
@@ -323,13 +359,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   /* ── Load an existing chat from storage ──────────────────── */
-  window.addEventListener('lexis:loadChat', (e) => {
+  window.addEventListener('lexis:loadChat', async (e) => {
     const { chatId } = e.detail;
     currentChatId = chatId;
-    conversationHistory = ChatStorage.loadMessages(chatId, currentUserId);
 
     messagesEl.innerHTML = '';
     welcomeEl.style.display = 'none';
+    messagesEl.innerHTML = '<p style="text-align:center;color:var(--text-faint);font-size:13px;padding:24px 8px;">Loading…</p>';
+
+    conversationHistory = await ChatStorage.loadMessages(chatId, currentUserId);
+    messagesEl.innerHTML = '';
 
     if (conversationHistory.length === 0) {
       welcomeEl.style.display = 'flex';
@@ -459,6 +498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Remove last assistant message from history and re-send
       if (conversationHistory[conversationHistory.length - 1]?.role === 'assistant') {
         conversationHistory.pop();
+        await ChatStorage.deleteLastAssistantMessage(currentChatId, currentUserId);
       }
       msgEl.remove();
 
@@ -476,7 +516,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const newMsgEl = addMessage('ai', aiText);
         addMessageActions(newMsgEl, aiText);
         conversationHistory.push({ role: 'assistant', content: aiText });
-        ChatStorage.saveMessages(currentChatId, currentUserId, conversationHistory);
+        ChatStorage.appendMessage(currentChatId, currentUserId, { role: 'assistant', content: aiText });
       } catch (err) {
         typingEl.remove();
         if (err.name !== 'AbortError') showToast('Regeneration failed', 'error');

@@ -65,6 +65,19 @@ const LexisAuth = (() => {
     const user = await getUser();
     if (!sb || !user) return null;
 
+    // Guests (anonymous sign-in) have no email/name — handle separately
+    if (user.is_anonymous) {
+      return {
+        id:       user.id,
+        name:     'Guest',
+        email:    '',
+        avatar:   `https://i.pravatar.cc/100?u=${user.id}`,
+        plan:     'guest',
+        provider: 'anonymous',
+        isGuest:  true,
+      };
+    }
+
     // OAuth providers (Google) store name/picture in user_metadata
     const meta = user.user_metadata || {};
 
@@ -78,11 +91,12 @@ const LexisAuth = (() => {
     // Priority: profiles table > OAuth metadata > fallbacks
     return {
       id:       user.id,
-      name:     data?.full_name  || meta.full_name  || meta.name    || user.email.split('@')[0],
+      name:     data?.full_name  || meta.full_name  || meta.name    || (user.email ? user.email.split('@')[0] : 'Student'),
       email:    user.email       || '',
       avatar:   data?.avatar_url || meta.avatar_url || meta.picture || `https://i.pravatar.cc/100?u=${user.id}`,
       plan:     data?.plan       || 'free',
       provider: user.app_metadata?.provider || 'email',
+      isGuest:  false,
     };
   }
 
@@ -107,6 +121,31 @@ const LexisAuth = (() => {
       console.warn('getAccessToken error:', e.message);
       return null;
     }
+  }
+
+  /* ── Get the raw Supabase client ───────────────────────────
+     Used by sidebar.js / chat.js to query the chats /
+     chat_messages tables directly. Row Level Security on those
+     tables (set up in the SQL migration) means each user can only
+     ever read/write their own rows, even though the client here
+     is shared. ─────────────────────────────────────────────────── */
+  function getClient() {
+    return getSB();
+  }
+
+  /* ── Continue as Guest (Supabase anonymous sign-in) ────────
+     Gives the visitor a real (but nameless) Supabase session, so
+     all the existing session/token machinery — including the
+     ai-chat edge function's auth check — works for them exactly
+     the same as a logged-in user. Requires "Allow anonymous
+     sign-ins" to be turned on in Supabase Dashboard → Authentication.
+  ─────────────────────────────────────────────────────────────── */
+  async function continueAsGuest() {
+    const sb = getSB();
+    if (!sb) throw new Error('Supabase not initialised.');
+    const { data, error } = await sb.auth.signInAnonymously();
+    if (error) throw error;
+    return data;
   }
 
   /* ── Google Sign-In via Supabase OAuth ───────────────────── */
@@ -223,12 +262,13 @@ const LexisAuth = (() => {
     // User message avatar (for new messages)
     window._lexisUserAvatar = profile.avatar;
     window._lexisUserName   = profile.name;
+    window._lexisIsGuest    = !!profile.isGuest;
 
     // Plan badge
     const badge = document.getElementById('planBadge');
-    if (badge) badge.textContent = profile.plan === 'pro' ? 'Pro' : 'Free';
+    if (badge) badge.textContent = profile.isGuest ? 'Guest' : (profile.plan === 'pro' ? 'Pro' : 'Free');
     const settingsBadge = document.getElementById('settingsPlanBadge');
-    if (settingsBadge) settingsBadge.textContent = profile.plan === 'pro' ? 'Pro Plan' : 'Free Plan';
+    if (settingsBadge) settingsBadge.textContent = profile.isGuest ? 'Guest' : (profile.plan === 'pro' ? 'Pro Plan' : 'Free Plan');
 
     // Personalised welcome
     const wt = document.getElementById('welcomeTitle');
@@ -248,8 +288,8 @@ const LexisAuth = (() => {
   }
 
   return {
-    getUser, getUserProfile, isLoggedIn, getAccessToken,
-    signInWithGoogle, signUpWithEmail, signInWithEmail,
+    getUser, getUserProfile, isLoggedIn, getAccessToken, getClient,
+    signInWithGoogle, continueAsGuest, signUpWithEmail, signInWithEmail,
     sendPasswordReset, signOut, upsertProfile,
     populateChatUI, onAuthStateChange,
     redirectToChat, redirectToLogin,
@@ -398,6 +438,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       showToast(err.message || 'Google sign-in failed. Try again.', 'error');
       setLoading('google', false);
+    }
+  });
+
+  // ── Continue as Guest ────────────────────────────────────────
+  $('guestContinueBtn')?.addEventListener('click', async () => {
+    const btn  = $('guestContinueBtn');
+    const txt  = $('guestBtnText');
+    const spin = $('guestSpinner');
+    if (btn)  btn.disabled       = true;
+    if (txt)  txt.style.display  = 'none';
+    if (spin) spin.style.display = 'block';
+    try {
+      await LexisAuth.continueAsGuest();
+      LexisAuth.redirectToChat();
+    } catch (err) {
+      showToast(err.message || 'Could not start a guest session. Try again.', 'error');
+      if (btn)  btn.disabled       = false;
+      if (txt)  txt.style.display  = '';
+      if (spin) spin.style.display = 'none';
     }
   });
 
