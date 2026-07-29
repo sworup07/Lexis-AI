@@ -1,135 +1,52 @@
 /* ═══════════════════════════════════════════════════════════════
    chat.js — Lexis AI Chat Interface
    ─────────────────────────────────────────────────────────────
-   CHANGES FROM PREVIOUS VERSION:
-   • Removed all fake AI_RESPONSES hardcoded data
-   • Removed fake chat history from sidebar seed data
-   • Real chat history persisted to localStorage per user
-   • AI responses come from a real API (OpenRouter free tier by
-     default — swap API_CONFIG below for your own backend)
-   • Events renamed from eduvision: → lexis: consistently
-   • Auth uses async LexisAuth (Supabase) properly
-   • User avatar is fetched from Supabase session
-   ─────────────────────────────────────────────────────────────
-   TO CONNECT YOUR OWN AI BACKEND:
-   Set API_CONFIG.endpoint to your URL and update buildPayload()
-   to match your API's request format.
-═══════════════════════════════════════════════════════════════ */
-
-/* ── AI API Configuration ────────────────────────────────────
-   Using OpenRouter (free tier, no credit card needed):
-   1. Sign up at https://openrouter.ai
-   2. Copy your API key → paste into API_KEY below
-   3. Choose any free model from https://openrouter.ai/models
-
-   To use your own backend later:
-   • Set endpoint to your server URL e.g. 'https://api.yoursite.com/chat'
-   • Set provider to 'custom'
-   • Update buildPayload() and parseResponse() below
-─────────────────────────────────────────────────────────────── */
+   SECURITY FIX: this file no longer talks to OpenRouter directly
+   and no longer holds an API key. It calls our own Supabase Edge
+   Function (ai-chat) instead, authenticated with the signed-in
+   user's session token. The OpenRouter key and the system prompt
+   both live server-side now, in supabase/functions/ai-chat/index.ts.
+   ─────────────────────────────────────────────────────────────── */
 const API_CONFIG = {
-  provider: 'openrouter',
-  endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-  apiKey:   'API KEY',
-  model:    'MODEL',   // ← updated to available free model
+  // SUPABASE_URL is declared in auth.js, which loads before this
+  // file — classic <script> tags share the same top-level scope,
+  // so it's already available here without redeclaring it.
+  endpoint: `${SUPABASE_URL}/functions/v1/ai-chat`,
 };
 
-/* System prompt — defines how Lexis AI behaves */
-const SYSTEM_PROMPT = `
-You are Lexis AI, an intelligent academic assistant designed specifically for Nepali students.
-You were created by a Nepali student developer, Sworup Pokhrel.
-
-Your primary role is to act as a strict but helpful educational tutor.
-
-════════════════════════════════════
-🎯 CORE EXPERTISE
-════════════════════════════════════
-You specialize in:
-
-- Nepal CDC curriculum (Grade 11 & 12 Science, Management, Humanities)
-- NEB exam preparation, past paper analysis, and marking patterns
-- GPA calculation system used in Nepal (A+, A, B+, B, C+, C, D, NG)
-- IOE engineering entrance preparation
-- Medical entrance (IOM) and other competitive exams in Nepal
-- Scholarships (government + international opportunities for Nepali students)
-- Study planning, revision strategies, and exam techniques
-
-════════════════════════════════════
-📚 RESPONSE RULES
-════════════════════════════════════
-- Always prioritize Nepal CDC + NEB context first
-- Always explain answers in an exam-oriented way
-- Use simple, clear, structured English
-- Provide step-by-step explanations for math/science problems
-- Give Nepal-relevant examples whenever possible
-- Keep answers useful for Grade 11–12 students
-- If the topic is outside academics, gently redirect back to education
-
-════════════════════════════════════
-🧠 TEACHING STYLE
-════════════════════════════════════
-- Be like a patient classroom teacher
-- Focus on understanding, not just answers
-- Break complex ideas into simple steps
-- Use bullet points when helpful
-- Avoid unnecessary long storytelling
-
-════════════════════════════════════
-🚫 RESTRICTIONS
-════════════════════════════════════
-- Do NOT provide unrelated entertainment or random facts unless asked
-- Do NOT drift away from academic purpose
-- Do NOT assume foreign syllabus unless user requests it
-- If unsure, default to Nepal CDC context
-
-════════════════════════════════════
-🎓 GOAL
-════════════════════════════════════
-Help Nepali students understand concepts clearly, score better in exams, and build strong academic foundations.
-
-Always respond in helpful, structured English.
-`;
-
 /* ─────────────────────────────────────────────────────────────
-   Build the request payload for the AI API
+   Build the request payload for the edge function.
+   No system prompt, no API key, no model whitelist here — the
+   edge function owns all of that server-side.
 ─────────────────────────────────────────────────────────────── */
 function buildPayload(conversationHistory) {
-  if (API_CONFIG.provider === 'openrouter' || API_CONFIG.provider === 'custom') {
-    return {
-      model: API_CONFIG.model,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        ...conversationHistory,
-      ],
-      stream: false,  // set to true if your endpoint supports SSE streaming
-      max_tokens: 1024,
-    };
-  }
-  // Add more providers here as needed
-  return {};
+  return { messages: conversationHistory };
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Parse the response from the AI API
+   Parse the response from the edge function
+   (it forwards OpenRouter's OpenAI-compatible response shape)
 ─────────────────────────────────────────────────────────────── */
 function parseResponse(json) {
-  // OpenAI-compatible format (OpenRouter, most providers)
   return json?.choices?.[0]?.message?.content || 'Sorry, I could not generate a response. Please try again.';
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Call the AI API
+   Call the AI via our Supabase Edge Function
 ─────────────────────────────────────────────────────────────── */
 async function callAI(conversationHistory, signal) {
+  const token = (typeof LexisAuth !== 'undefined') ? await LexisAuth.getAccessToken() : null;
+  if (!token) {
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+
   let res;
   try {
     res = await fetch(API_CONFIG.endpoint, {
       method: 'POST',
       headers: {
         'Content-Type':  'application/json',
-        'Authorization': 'Bearer ' + API_CONFIG.apiKey,
-        'HTTP-Referer':  window.location.origin,
-        'X-Title':       'Lexis AI',
+        'Authorization': 'Bearer ' + token,
       },
       body:   JSON.stringify(buildPayload(conversationHistory)),
       signal: signal,
@@ -140,10 +57,11 @@ async function callAI(conversationHistory, signal) {
   }
 
   if (!res.ok) {
-    let errMsg = 'API error ' + res.status;
-    try { const j = await res.json(); errMsg = j?.error?.message || j?.message || errMsg; } catch (_) {}
-    if (res.status === 401) errMsg = 'Invalid API key. Check your key in chat.js.';
-    if (res.status === 402) errMsg = 'OpenRouter account has no credits.';
+    // Our edge function returns { error: "message" } — a plain string,
+    // not OpenRouter's nested { error: { message } } shape.
+    let errMsg = 'Something went wrong (error ' + res.status + ').';
+    try { const j = await res.json(); errMsg = j?.error || errMsg; } catch (_) {}
+    if (res.status === 401) errMsg = 'Your session has expired. Please sign in again.';
     if (res.status === 429) errMsg = 'Rate limit hit. Wait a moment and try again.';
     if (res.status === 503) errMsg = 'Model temporarily unavailable. Try again shortly.';
     throw new Error(errMsg);
@@ -387,8 +305,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       typingEl.remove();
       if (err.name !== 'AbortError') {
-        addMessage('ai', `**Error:** ${err.message}\n\nPlease check your API key in \`js/chat.js\` and try again.`);
-        showToast('Could not reach AI — check API key', 'error');
+        addMessage('ai', `**Error:** ${err.message}`);
+        showToast('Could not reach Lexis AI', 'error');
       }
     } finally {
       isStreaming = false;

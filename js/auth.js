@@ -91,6 +91,24 @@ const LexisAuth = (() => {
     return !!(await getUser());
   }
 
+  /* ── Get the current session's access token ───────────────
+     Used by chat.js to authenticate to the Supabase Edge Function
+     (ai-chat). This replaces any hardcoded API key — the edge
+     function verifies this token server-side before calling
+     OpenRouter, so no AI provider key ever needs to live in the
+     browser. ─────────────────────────────────────────────────── */
+  async function getAccessToken() {
+    const sb = getSB();
+    if (!sb) return null;
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      return session?.access_token || null;
+    } catch (e) {
+      console.warn('getAccessToken error:', e.message);
+      return null;
+    }
+  }
+
   /* ── Google Sign-In via Supabase OAuth ───────────────────── */
   async function signInWithGoogle() {
     const sb = getSB();
@@ -230,7 +248,7 @@ const LexisAuth = (() => {
   }
 
   return {
-    getUser, getUserProfile, isLoggedIn,
+    getUser, getUserProfile, isLoggedIn, getAccessToken,
     signInWithGoogle, signUpWithEmail, signInWithEmail,
     sendPasswordReset, signOut, upsertProfile,
     populateChatUI, onAuthStateChange,
