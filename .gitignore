@@ -1,0 +1,31 @@
+# --- Secrets / environment files ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- OS / editor junk ---
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/*
+!.vscode/extensions.json
+
+# --- Node (if you ever add tooling/build steps) ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# --- Supabase CLI local artifacts ---
+supabase/.branches
+supabase/.temp
+supabase/.env
+supabase/functions/**/.env
+
+# --- Netlify local artifacts ---
+.netlify/
+
+# --- Misc ---
+*.log
+.cache/
