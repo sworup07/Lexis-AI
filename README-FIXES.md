@@ -1,61 +1,80 @@
-# Lexis AI — Fixed Project
+# Lexis AI
 
-## What I changed
+Nepal's AI-powered educational chatbot** — helping students master the CDC curriculum, prepare for NEB exams, and find scholarships through personalized AI tutoring.
 
-**`js/chat.js`**
-- Removed the hardcoded OpenRouter API key and the direct
-  `fetch()` call to `openrouter.ai`.
-- It now calls your own Supabase Edge Function
-  (`${SUPABASE_URL}/functions/v1/ai-chat`) instead, and sends the
-  signed-in user's Supabase session token in the `Authorization`
-  header — the same token your edge function (`index.ts`) already
-  checks.
-- Removed the duplicate `SYSTEM_PROMPT` (it already lives
-  server-side in `index.ts` — no need for two copies).
-- Fixed the error-message parsing to match what your edge function
-  actually returns (`{ error: "..." }`), and removed the leftover
-  "check your API key in chat.js" message shown to users.
+🔗 Live site: [lexis-np.netlify.app](https://lexis-np.netlify.app)
 
-**`js/auth.js`**
-- Added one small function, `getAccessToken()`, exposed on
-  `LexisAuth`. That's what `chat.js` now calls to get the token it
-  sends to the edge function.
+---
 
-Nothing else was touched — `index.ts`, your CSS, HTML structure,
-sidebar/modals/theme logic are all exactly as you had them, since
-those were already fine.
+# What it does
 
-## Folder structure (matters for the `<link>`/`<script>` paths)
+- 🤖 AI-Powered Tutoring — chat-based help aligned with the Nepali CDC curriculum
+- 📚 CDC Curriculum Notes — subject notes for NEB exam preparation
+- 🎓 Scholarship Finder — helps students discover scholarship opportunities
+- 🔐 Google Sign-In — with a limited free tier (5 questions/day) for users without an account
 
+Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Static HTML/CSS/JS (no build step) |
+| Auth | Supabase Auth (Google OAuth) |
+| Backend | Supabase Edge Functions (Deno) |
+| AI | OpenRouter API (called server-side only) |
+| Hosting | Netlify |
+
+Project structure
+
+
+index.html               # Landing / sign-in page
+chat.html                 # Main chat interface
+css/                       # shared.css, login.css, chat.css
+js/                        # auth.js, theme.js, sidebar.js, chat.js, modals.js
+images/                    # Static assets
+supabase/functions/ai-chat/index.ts   # Edge Function that proxies AI calls
+
+
+The HTML files reference `css/...`, `js/...`, and `images/...` as relative paths — keep this folder structure when deploying (don't flatten it).
+
+## How the AI chat works
+
+The browser **never** talks to OpenRouter directly. `chat.js` sends the signed-in user's Supabase session token to a Supabase Edge Function (`/functions/v1/ai-chat`), which validates the token and makes the OpenRouter call server-side. This keeps the AI API key off the client entirely.
+
+## Setup
+
+### 1. Clone and configure Supabase
+
+```bash
+git clone https://github.com/sworup07/EduVision-Nepal-AI.git
+cd EduVision-Nepal-AI
 ```
-index.html
-chat.html
-css/  → shared.css, login.css, chat.css
-js/   → auth.js, theme.js, sidebar.js, chat.js, modals.js
-images/ → purnima.JPG
-supabase/functions/ai-chat/index.ts
+
+Create a Supabase project, then set the following **as Edge Function secrets** (never in client code):
+
+```bash
+supabase secrets set OPENROUTER_API_KEY=your_key_here
 ```
-Your HTML already references `css/...`, `js/...`, `images/...`, so
-keep this structure when you upload/push — don't flatten the folders.
 
-## What's left to do (in order)
+### 2. Configure allowed origins
 
-1. **Confirm the OpenRouter key you put in Supabase is a NEW one** —
-   not the one that was hardcoded in the old `chat.js`
-   (`sk-or-v1-ef29...`). That one is burned; if you haven't already,
-   go to OpenRouter and revoke it.
-2. **Redeploy the edge function** so Supabase is running the latest
-   `index.ts` (same file as before, unchanged) — see "Supabase
-   confirm" below for exact steps.
-3. **Push this whole folder to GitHub.** With no real key in any
-   file, push protection has nothing to block.
-4. **Deploy `index.html` / `chat.html` / `css/` / `js/` / `images/`
-   to Netlify** (static hosting — no build step needed).
-5. **Test end-to-end:** open the live Netlify URL, sign in, send a
-   message, confirm you get a reply back.
+In `supabase/functions/ai-chat/index.ts`, update `ALLOWED_ORIGINS` to include your deployed URL (e.g. your Netlify domain), or the Edge Function will reject browser requests with a CORS error.
 
-## If Netlify's URL differs from `lexis-np.netlify.app`
+### 3. Deploy the Edge Function
 
-Open `supabase/functions/ai-chat/index.ts`, find `ALLOWED_ORIGINS`,
-add your real URL, then redeploy the function. Otherwise the
-browser's requests will be blocked by CORS.
+```bash
+supabase functions deploy ai-chat
+```
+
+### 4. Deploy the frontend
+
+This is a static site — no build step. Deploy `index.html`, `chat.html`, `css/`, `js/`, and `images/` directly to Netlify (or any static host).
+
+## Security notes
+
+- API keys live only in Supabase Edge Function secrets — **never** commit them to this repo.
+- If you ever hardcode a key locally for testing, make sure it's covered by `.gitignore` before committing.
+- Auth is handled via Supabase session tokens; the Edge Function verifies the token before calling the AI provider.
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
