@@ -1,19 +1,19 @@
 # Lexis AI
 
-Nepal's AI-powered educational chatbot** — helping students master the CDC curriculum, prepare for NEB exams, and find scholarships through personalized AI tutoring.
+**Nepal's AI-powered educational chatbot** — helping students master the CDC curriculum, prepare for NEB exams, and find scholarships through personalized AI tutoring.
 
 🔗 Live site: [lexis-np.netlify.app](https://lexis-np.netlify.app)
 
 ---
 
-# What it does
+## What it does
 
-- 🤖 AI-Powered Tutoring — chat-based help aligned with the Nepali CDC curriculum
-- 📚 CDC Curriculum Notes — subject notes for NEB exam preparation
-- 🎓 Scholarship Finder — helps students discover scholarship opportunities
-- 🔐 Google Sign-In — with a limited free tier (5 questions/day) for users without an account
+- 🤖 **AI-Powered Tutoring** — chat-based help aligned with the Nepali CDC curriculum
+- 📚 **CDC Curriculum Notes** — subject notes for NEB exam preparation
+- 🎓 **Scholarship Finder** — helps students discover scholarship opportunities
+- 🔐 **Google Sign-In** — with a limited free tier (5 questions/day) for users without an account
 
-Tech stack
+## Tech stack
 
 | Layer | Technology |
 |---|---|
@@ -23,16 +23,16 @@ Tech stack
 | AI | OpenRouter API (called server-side only) |
 | Hosting | Netlify |
 
-Project structure
+## Project structure
 
-
+```
 index.html               # Landing / sign-in page
 chat.html                 # Main chat interface
 css/                       # shared.css, login.css, chat.css
 js/                        # auth.js, theme.js, sidebar.js, chat.js, modals.js
 images/                    # Static assets
 supabase/functions/ai-chat/index.ts   # Edge Function that proxies AI calls
-
+```
 
 The HTML files reference `css/...`, `js/...`, and `images/...` as relative paths — keep this folder structure when deploying (don't flatten it).
 
@@ -45,8 +45,8 @@ The browser **never** talks to OpenRouter directly. `chat.js` sends the signed-i
 ### 1. Clone and configure Supabase
 
 ```bash
-git clone https://github.com/sworup07/EduVision-Nepal-AI.git
-cd EduVision-Nepal-AI
+git clone https://github.com/sworup07/Lexis-AI.git
+cd Lexis-AI
 ```
 
 Create a Supabase project, then set the following **as Edge Function secrets** (never in client code):
@@ -77,4 +77,4 @@ This is a static site — no build step. Deploy `index.html`, `chat.html`, `css/
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT — see [LICENSE](https://github.com/sworup07/Lexis-AI/blob/main/LICENSE).
